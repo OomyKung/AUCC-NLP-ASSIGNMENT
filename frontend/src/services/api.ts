@@ -10,6 +10,7 @@
 import type {
   AnalyzeResult,
   BackendStatus,
+  Evaluation,
   ChatMessage,
   Health,
   IngestResult,
@@ -111,6 +112,7 @@ export const api = {
   topics: () => request<Taxonomy[]>('/topics'),
   sentiments: () => request<Taxonomy[]>('/sentiments'),
   pipeline: () => request<BackendStatus[]>('/pipeline'),
+  evaluation: () => request<Evaluation>('/evaluation'),
 
   statistics: () => request<Statistics>('/statistics'),
   trend: (granularity: TrendGranularity) =>

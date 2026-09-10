@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import analyze, meta, news, statistics
+from app.api import analyze, evaluation, meta, news, statistics
 from app.config import settings
 from app.database.session import init_db
 
@@ -57,6 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(news.router, prefix=settings.api_prefix)
     app.include_router(statistics.router, prefix=settings.api_prefix)
     app.include_router(analyze.router, prefix=settings.api_prefix)
+    app.include_router(evaluation.router, prefix=settings.api_prefix)
 
     @app.get("/", include_in_schema=False)
     def root() -> dict:

@@ -56,6 +56,14 @@ class Settings(BaseSettings):
     nlp_tokenizer: Literal["newmm", "newmm-safe", "longest", "mm"] = "newmm"
     nlp_topic_backend: Literal["sklearn", "transformer"] = "sklearn"
     nlp_sentiment_backend: Literal["sklearn", "lexicon", "transformer"] = "sklearn"
+    # Per-message chat sentiment uses a SEPARATE backend, defaulting to the
+    # lexicon. Measured reason: the sklearn model is trained on formal news
+    # prose, and on short informal chat it drifts badly -- it labelled 59% of
+    # real chat messages positive and called "แย่ที่สุด" ("the worst")
+    # positive, while the hand-built chat lexicon got every spot check right.
+    # The reverse holds on news text, where the trained model wins. Each is
+    # used in the domain it was built for.
+    nlp_chat_sentiment_backend: Literal["sklearn", "lexicon", "transformer"] = "lexicon"
     nlp_summarizer_backend: Literal["extractive", "llm"] = "extractive"
     nlp_ner_backend: Literal["rules", "pythainlp"] = "rules"
 

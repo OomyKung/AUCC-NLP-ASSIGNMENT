@@ -52,6 +52,8 @@ class NLPComponents:
     tokenizer: Tokenizer
     topic: TopicBackend
     sentiment: SentimentBackend
+    # Separate backend for short chat messages; see config for why.
+    chat_sentiment: SentimentBackend
     keywords: KeywordExtractor
     summarizer: Summarizer
     entities: EntityRecognizer
@@ -64,6 +66,7 @@ class NLPComponents:
             "tokenizer": self.tokenizer.name,
             "topic": self.topic.name,
             "sentiment": self.sentiment.name,
+            "chat_sentiment": self.chat_sentiment.name,
             "keywords": self.keywords.name,
             "summarizer": self.summarizer.name,
             "entities": self.entities.name,
@@ -105,9 +108,11 @@ def _build_topic() -> tuple[TopicBackend, BackendStatus]:
     return fallback, BackendStatus(requested, fallback.name, False, note)
 
 
-def _build_sentiment() -> tuple[SentimentBackend, BackendStatus]:
-    """Resolve the sentiment backend, preferring a trained model when present."""
-    requested = settings.nlp_sentiment_backend
+def _build_sentiment(
+    requested: str | None = None,
+) -> tuple[SentimentBackend, BackendStatus]:
+    """Resolve a sentiment backend, preferring a trained model when present."""
+    requested = requested or settings.nlp_sentiment_backend
 
     if requested == "lexicon":
         backend = LexiconSentimentBackend()
@@ -180,6 +185,9 @@ def get_components() -> NLPComponents:
     """
     topic, topic_status = _build_topic()
     sentiment, sentiment_status = _build_sentiment()
+    chat_sentiment, chat_sentiment_status = _build_sentiment(
+        settings.nlp_chat_sentiment_backend
+    )
     summarizer, summarizer_status = _build_summarizer()
     entities, entities_status = _build_entities()
 
@@ -199,6 +207,7 @@ def get_components() -> NLPComponents:
         tokenizer=tokenizer,
         topic=topic,
         sentiment=sentiment,
+        chat_sentiment=chat_sentiment,
         keywords=keywords,
         summarizer=summarizer,
         entities=entities,
@@ -208,6 +217,7 @@ def get_components() -> NLPComponents:
             ),
             "topic": topic_status,
             "sentiment": sentiment_status,
+            "chat_sentiment": chat_sentiment_status,
             "keywords": keyword_status,
             "summarizer": summarizer_status,
             "entities": entities_status,

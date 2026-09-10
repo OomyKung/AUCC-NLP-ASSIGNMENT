@@ -16,7 +16,8 @@ import Explorer from '../pages/Explorer'
 import NewsDetail from '../pages/NewsDetail'
 import Analyze from '../pages/Analyze'
 import PipelinePage from '../pages/Pipeline'
-import { AboutPage, EvaluationPage } from '../pages/About'
+import { AboutPage } from '../pages/About'
+import EvaluationPage from '../pages/Evaluation'
 import AppLayout from '../layouts/AppLayout'
 import { fixtures } from './setup'
 
@@ -175,12 +176,26 @@ describe('About and Evaluation', () => {
     }
   })
 
-  it('Evaluation states honestly that no trained metrics exist yet', async () => {
+  it('Evaluation renders real metrics and the baseline comparison', async () => {
     mount(<EvaluationPage />, '/evaluation')
 
-    await waitFor(() => expect(screen.getByText('ยังไม่มีผลการประเมิน')).toBeTruthy())
-    // It must not invent an accuracy figure.
-    expect(screen.queryByText(/^Accuracy: \d/)).toBeNull()
+    await waitFor(() =>
+      expect(screen.getByText('ประเมินผลโมเดล (Model Evaluation)')).toBeTruthy(),
+    )
+
+    // Both tasks, and the metrics that the specification requires.
+    expect(screen.getByText('การจำแนกหัวข้อ (Topic)')).toBeTruthy()
+    expect(screen.getByText('การวิเคราะห์ความรู้สึก (Sentiment)')).toBeTruthy()
+    expect(screen.getAllByText('Accuracy').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Precision (macro)').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Recall (macro)').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('F1-score (macro)').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Confusion Matrix').length).toBe(2)
+
+    // The real accuracy from the fixture must appear, not a placeholder.
+    const accuracy = fixtures.evaluation.tasks.topic.models.trained.accuracy
+    const rendered = `${(accuracy * 100).toFixed(1)}%`
+    expect(screen.getAllByText(rendered).length).toBeGreaterThan(0)
   })
 })
 

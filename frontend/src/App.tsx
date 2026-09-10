@@ -5,7 +5,8 @@ import Explorer from './pages/Explorer'
 import NewsDetail from './pages/NewsDetail'
 import Analyze from './pages/Analyze'
 import PipelinePage from './pages/Pipeline'
-import { AboutPage, EvaluationPage } from './pages/About'
+import { AboutPage } from './pages/About'
+import EvaluationPage from './pages/Evaluation'
 import { EmptyState } from './components/ui'
 
 export default function App() {

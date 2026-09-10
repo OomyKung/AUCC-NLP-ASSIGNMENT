@@ -156,12 +156,14 @@ class NLPPipeline:
         )
 
     def sentiment_only(self, texts: list[str]) -> list[Prediction]:
-        """Per-message sentiment for a batch.
+        """Per-message sentiment for a batch of short chat messages.
 
-        Used for chat messages, where tens of thousands of very short texts are
-        scored and the full pipeline would be wasteful.
+        Uses the *chat* sentiment backend rather than the document one. The
+        difference matters: the news-trained model mislabels short informal chat
+        (see ``nlp_chat_sentiment_backend`` in config for the measurements),
+        while the lexicon was built for exactly this register.
         """
-        return self.components.sentiment.predict_many(texts)
+        return self.components.chat_sentiment.predict_many(texts)
 
 
 def get_pipeline() -> NLPPipeline:

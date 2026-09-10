@@ -235,3 +235,62 @@ export interface NewsFilters {
   page?: number
   page_size?: number
 }
+
+export interface PerClassMetrics {
+  precision: number
+  recall: number
+  f1: number
+  support: number
+}
+
+export interface CrossValidation {
+  folds: number
+  scoring: string
+  scores: number[]
+  mean: number
+  std: number
+}
+
+export interface ModelMetrics {
+  accuracy: number
+  precision_macro: number
+  recall_macro: number
+  f1_macro: number
+  precision_weighted: number
+  recall_weighted: number
+  f1_weighted: number
+  per_class: Record<string, PerClassMetrics>
+  confusion_matrix: { labels: string[]; matrix: number[][] }
+  support: number
+  algorithm: string
+  trained_at?: string
+  cross_validation?: CrossValidation | null
+}
+
+export interface TaskEvaluation {
+  labels: string[]
+  models: { trained?: ModelMetrics; baseline: ModelMetrics }
+  random_baseline_accuracy: number
+  trained_vs_baseline_f1_macro?: number
+  label_names?: Record<string, { thai: string; english: string; color: string }>
+}
+
+export interface Evaluation {
+  available: boolean
+  reason?: string
+  how_to?: string[]
+  generated_at: string
+  dataset: {
+    path: string
+    documents: number
+    topics: Record<string, number>
+    sentiments: Record<string, number>
+  }
+  split: {
+    test_size: number
+    random_state: number
+    stratified: boolean
+    note: string
+  }
+  tasks: Record<string, TaskEvaluation>
+}

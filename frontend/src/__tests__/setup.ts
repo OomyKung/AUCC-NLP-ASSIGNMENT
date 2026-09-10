@@ -17,6 +17,7 @@ import sentiments from './fixture-sentiments.json'
 import trend from './fixture-trend.json'
 import pipeline from './fixture-pipeline.json'
 import detail from './fixture-detail.json'
+import evaluation from './fixture-evaluation.json'
 
 export const fixtures = {
   statistics,
@@ -26,6 +27,7 @@ export const fixtures = {
   trend,
   pipeline,
   detail,
+  evaluation,
 }
 
 /** Map a request path to its fixture. */
@@ -36,6 +38,7 @@ function resolve(path: string): unknown {
   if (path.startsWith('/api/topics')) return topics
   if (path.startsWith('/api/sentiments')) return sentiments
   if (path.startsWith('/api/pipeline')) return pipeline
+  if (path.startsWith('/api/evaluation')) return evaluation
   if (path.startsWith('/api/streams')) return []
   if (path.startsWith('/api/ingest/snapshots')) return []
   if (/^\/api\/news\/\d+\/messages/.test(path)) return []

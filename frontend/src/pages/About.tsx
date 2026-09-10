@@ -1,6 +1,5 @@
 /** About Project and Evaluation pages. */
 
-import { ErrorState, LoadingState } from '../components/ui'
 import { useAsync } from '../hooks'
 import { api } from '../services/api'
 
@@ -155,100 +154,10 @@ export function AboutPage() {
       <Section title="การประเมินผล (Evaluation)">
         <p lang="th">
           ดูหน้า <strong>ประเมินผลโมเดล</strong> สำหรับค่า Accuracy, Precision, Recall,
-          F1-score และ Confusion Matrix
+          F1-score และ Confusion Matrix ที่วัดจากชุดทดสอบซึ่งโมเดลไม่เคยเห็น
+          พร้อมเปรียบเทียบกับโมเดลฐานแบบกฎบนชุดทดสอบเดียวกัน
         </p>
       </Section>
-    </div>
-  )
-}
-
-/* -------------------------------------------------------------------------- */
-/* Evaluation                                                                 */
-/* -------------------------------------------------------------------------- */
-
-export function EvaluationPage() {
-  const backends = useAsync(() => api.pipeline(), [])
-
-  const trained = backends.data?.filter((row) => row.trained) ?? []
-  const baseline = backends.data?.filter((row) => !row.trained) ?? []
-
-  return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header>
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-          ประเมินผลโมเดล (Evaluation)
-        </h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400" lang="th">
-          Accuracy, Precision, Recall, F1-score และ Confusion Matrix
-        </p>
-      </header>
-
-      {backends.error ? (
-        <ErrorState message={backends.error} onRetry={backends.reload} />
-      ) : !backends.data ? (
-        <LoadingState rows={2} />
-      ) : (
-        <>
-          {/* The honest state of things: metrics require a trained model. */}
-          <div className="card border-l-4 border-amber-400 p-5">
-            <h3 className="font-semibold text-slate-900 dark:text-white">
-              ยังไม่มีผลการประเมิน
-            </h3>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300" lang="th">
-              ขณะนี้ระบบใช้โมเดลฐาน (baseline) แบบอาศัยคลังคำและกฎ ซึ่งไม่ได้ผ่านการฝึก
-              จากชุดข้อมูลที่มีเฉลย จึงยังไม่มีค่า Accuracy / F1 ที่วัดได้อย่างถูกต้อง
-              การแสดงตัวเลขในขั้นนี้จะเป็นการกุข้อมูล
-            </p>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300" lang="th">
-              เมื่อฝึกโมเดลด้วยชุดข้อมูลที่ติดป้ายกำกับแล้ว หน้านี้จะแสดงผลการวัดจริง
-              พร้อม Confusion Matrix ทั้งของการจำแนกหัวข้อและการวิเคราะห์ความรู้สึก
-            </p>
-            <div className="mt-4 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/50">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                วิธีสร้างผลการประเมิน
-              </p>
-              <pre className="overflow-x-auto text-xs text-slate-600 dark:text-slate-300">
-{`cd backend
-python train.py       # ฝึกโมเดลจาก data/news_dataset.csv
-python evaluate.py    # เขียน models/metrics.json`}
-              </pre>
-            </div>
-          </div>
-
-          <section className="card p-5">
-            <h3 className="mb-3 font-semibold text-slate-900 dark:text-white">
-              สถานะโมเดลแต่ละส่วน
-            </h3>
-            <ul className="space-y-2 text-sm">
-              {trained.map((row) => (
-                <li key={row.stage} className="flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-positive" />
-                  <span className="font-medium text-slate-700 dark:text-slate-200">
-                    {row.stage}
-                  </span>
-                  <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs dark:bg-slate-800">
-                    {row.active}
-                  </code>
-                </li>
-              ))}
-              {baseline.map((row) => (
-                <li key={row.stage} className="flex flex-wrap items-center gap-2">
-                  <span className="size-2 rounded-full bg-amber-400" />
-                  <span className="font-medium text-slate-700 dark:text-slate-200">
-                    {row.stage}
-                  </span>
-                  <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs dark:bg-slate-800">
-                    {row.active}
-                  </code>
-                  {row.note && (
-                    <span className="text-xs text-slate-400">{row.note}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        </>
-      )}
     </div>
   )
 }

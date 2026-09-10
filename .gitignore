@@ -14,13 +14,17 @@ venv/
 
 # ---- Database ----
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 
-# ---- Trained model artefacts (regenerate with `python train.py`) ----
-backend/models/*.pkl
+# ---- Trained model artefacts ----
+# The fitted models (3.7 MB) and their metrics ARE committed, so a fresh clone
+# runs with the trained pipeline and a populated Evaluation page without anyone
+# having to train first. Regenerate them with:
+#   python build_dataset.py && python train.py && python evaluate.py
 backend/models/*.joblib
-backend/models/metrics.json
 
 # ---- Node / frontend ----
 node_modules/
