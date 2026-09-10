@@ -1,0 +1,13 @@
+# Normalise line endings: LF in the repository, native in the working copy.
+* text=auto
+
+# Binary assets must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.svg text
+*.pkl binary
+*.joblib binary
+
+# Data files are UTF-8 Thai text.
+*.csv text
+*.jsonl text

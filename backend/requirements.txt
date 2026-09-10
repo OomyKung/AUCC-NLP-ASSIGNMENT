@@ -1,0 +1,31 @@
+# Thai News Intelligence Dashboard - backend dependencies
+# Verified to install on Python 3.14 / Windows (cp314-win_amd64 wheels available)
+
+# --- Web framework ---
+fastapi==0.141.1
+uvicorn==0.52.4
+python-multipart==0.0.32
+
+# --- Configuration ---
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-dotenv==1.2.3
+
+# --- Database ---
+SQLAlchemy==2.0.52
+
+# --- NLP ---
+pythainlp==5.3.7
+python-crfsuite==0.9.12   # enables PyThaiNLP crfcut Thai sentence segmentation
+scikit-learn==1.9.0
+numpy==2.5.3
+scipy==1.18.1
+pandas==3.0.5
+joblib==1.6.0
+
+# --- Data collection (YouTube live chat) ---
+yt-dlp==2026.8.19
+httpx==0.28.1
+
+# --- Testing ---
+pytest==9.1.1
