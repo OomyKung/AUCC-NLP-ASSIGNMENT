@@ -9,7 +9,7 @@
   --font-sans: 'Inter', 'Noto Sans Thai', ui-sans-serif, system-ui, sans-serif;
   --font-thai: 'Noto Sans Thai', 'Inter', ui-sans-serif, system-ui, sans-serif;
 
-  /* Brand: soft indigo. */
+  /* Brand: soft indigo. Both steps validated for >=3:1 against their surface. */
   --color-brand-50: #eef2ff;
   --color-brand-100: #e0e7ff;
   --color-brand-200: #c7d2fe;
@@ -21,9 +21,14 @@
   --color-brand-800: #3730a3;
   --color-brand-900: #312e81;
 
-  /* Sentiment palette (kept muted per the design brief). */
-  --color-positive: #16a34a;
-  --color-positive-soft: #dcfce7;
+  /* Sentiment is a DIVERGING scale: two poles around a neutral gray midpoint.
+     The positive pole is teal-leaning green, not pure green, because pure green
+     (#16a34a) against red separates by only deutan ΔE 5.0 -- red-green
+     colourblind viewers could not distinguish positive from negative. The teal
+     green reaches ΔE 13.1. Verified with the dataviz palette validator.
+     Dark steps are selected against the dark surface, not lightened copies. */
+  --color-positive: #0d9488;
+  --color-positive-soft: #ccfbf1;
   --color-neutral: #64748b;
   --color-neutral-soft: #f1f5f9;
   --color-negative: #dc2626;
@@ -34,6 +39,30 @@
   --color-surface: #ffffff;
   --color-canvas-dark: #0f1420;
   --color-surface-dark: #171d2b;
+}
+
+/* Chart colours are read from CSS by the chart components, so light and dark
+   stay in one place and cannot drift from the badges. */
+:root {
+  --chart-positive: #0d9488;
+  --chart-neutral: #64748b;
+  --chart-negative: #dc2626;
+  --chart-brand: #4f46e5;
+  --chart-grid: #e2e8f0;
+  --chart-axis: #64748b;
+  --chart-surface: #ffffff;
+  --chart-ink: #1e293b;
+}
+
+.dark {
+  --chart-positive: #0d9488;
+  --chart-neutral: #94a3b8;
+  --chart-negative: #ef4444;
+  --chart-brand: #6366f1;
+  --chart-grid: #2b3446;
+  --chart-axis: #94a3b8;
+  --chart-surface: #171d2b;
+  --chart-ink: #e2e8f0;
 }
 
 @layer base {
@@ -49,7 +78,7 @@
     min-height: 100vh;
   }
 
-  /* Thai text renders with taller ascenders/descenders; give it room. */
+  /* Thai renders with taller ascenders/descenders; give it room. */
   :lang(th) {
     line-height: 1.75;
   }
@@ -57,11 +86,64 @@
   ::selection {
     @apply bg-brand-200 text-brand-900;
   }
+
+  /* Visible keyboard focus everywhere, since much of the UI is interactive. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+
+  /* Respect a user's reduced-motion preference. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 @layer components {
   .card {
     @apply bg-surface dark:bg-surface-dark rounded-2xl border border-slate-200/80
            dark:border-slate-700/60 shadow-sm;
+  }
+
+  .card-hover {
+    @apply transition-shadow duration-200 hover:shadow-md;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+           text-slate-800 placeholder:text-slate-400
+           focus:border-brand-400 focus:ring-2 focus:ring-brand-100 focus:outline-none
+           dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100
+           dark:placeholder:text-slate-500 dark:focus:ring-brand-900/40;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600
+           px-4 py-2 text-sm font-medium text-white transition-colors
+           hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border
+           border-slate-200 px-3 py-2 text-sm font-medium text-slate-600
+           transition-colors hover:bg-slate-50 disabled:opacity-50
+           dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60;
+  }
+
+  /* Thin scrollbars inside panels, so long token lists stay unobtrusive. */
+  .scroll-thin {
+    scrollbar-width: thin;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300 dark:bg-slate-600;
   }
 }

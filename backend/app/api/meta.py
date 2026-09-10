@@ -48,6 +48,12 @@ def list_topics() -> list[dict]:
 def list_sentiments() -> list[dict]:
     """Return the sentiment taxonomy with display colours."""
     return [
-        {"slug": s.slug, "thai": s.thai, "english": s.english, "color": s.color}
+        {
+            "slug": s.slug,
+            "thai": s.thai,
+            "english": s.english,
+            "color": s.color,
+            "color_dark": s.color_dark,
+        }
         for s in SENTIMENTS
     ]
