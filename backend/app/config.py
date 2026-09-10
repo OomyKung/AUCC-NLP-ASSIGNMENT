@@ -53,7 +53,7 @@ class Settings(BaseSettings):
 
     # ----------------------------------------------------- NLP backend wiring
     # Swapping any model = change one value here (see app/nlp/registry.py).
-    nlp_tokenizer: Literal["newmm", "longest", "whitespace"] = "newmm"
+    nlp_tokenizer: Literal["newmm", "newmm-safe", "longest", "mm"] = "newmm"
     nlp_topic_backend: Literal["sklearn", "transformer"] = "sklearn"
     nlp_sentiment_backend: Literal["sklearn", "lexicon", "transformer"] = "sklearn"
     nlp_summarizer_backend: Literal["extractive", "llm"] = "extractive"
