@@ -31,7 +31,11 @@ from app.config import settings  # noqa: E402
 from app.database.session import SessionLocal, init_db  # noqa: E402
 from app.services.chat_store import store_messages  # noqa: E402
 from app.services.collectors import CollectorError, get_collector  # noqa: E402
-from app.services.snapshot import list_snapshots, write_snapshot  # noqa: E402
+from app.services.snapshot import (  # noqa: E402
+    SnapshotWouldShrink,
+    list_snapshots,
+    write_snapshot,
+)
 from app.services.windowing import build_windows  # noqa: E402
 
 
@@ -155,8 +159,11 @@ def collect_one(
         )
 
     if save_snapshot:
-        path = write_snapshot(result)
-        print(f"  snapshot: {path.name} ({path.stat().st_size / 1024:.1f} kB)")
+        try:
+            path = write_snapshot(result)
+            print(f"  snapshot: {path.name} ({path.stat().st_size / 1024:.1f} kB)")
+        except SnapshotWouldShrink as exc:
+            print(f"  snapshot: SKIPPED - {exc}", file=sys.stderr)
 
     if store:
         init_db()

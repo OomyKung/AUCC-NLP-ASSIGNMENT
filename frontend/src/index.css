@@ -81,6 +81,19 @@
   /* Thai renders with taller ascenders/descenders; give it room. */
   :lang(th) {
     line-height: 1.75;
+    /* Thai has no spaces between words, so a long run offers the layout engine
+       no break opportunity and overflows its container on narrow screens. A
+       single sentence here is routinely 70+ characters with zero spaces.
+       `anywhere` lets it wrap; browsers with Thai dictionary support still
+       prefer real word boundaries, so this only takes effect as a fallback. */
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  /* Same protection for URLs, hashes and long ids in either script. */
+  code,
+  pre {
+    overflow-wrap: anywhere;
   }
 
   ::selection {

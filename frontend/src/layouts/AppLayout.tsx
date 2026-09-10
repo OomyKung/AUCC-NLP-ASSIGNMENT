@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ToastHost } from '../components/ui'
+import { API_DOCS_URL } from '../services/api'
 import { useTheme } from '../hooks'
 
 interface NavItem {
@@ -151,7 +152,7 @@ export default function AppLayout() {
 
         <div className="border-t border-slate-200/80 p-3 dark:border-slate-700/60">
           <a
-            href="/docs"
+            href={API_DOCS_URL}
             target="_blank"
             rel="noreferrer noopener"
             className="btn-ghost w-full"

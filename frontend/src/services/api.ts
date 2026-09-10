@@ -28,6 +28,18 @@ import type {
 
 const BASE = '/api'
 
+/**
+ * Absolute URL of FastAPI's interactive docs.
+ *
+ * It cannot be a bare "/docs" link: the Vite dev server only proxies "/api", so
+ * "/docs" would resolve to the SPA's catch-all route instead of the API docs. In
+ * dev the backend is a different origin, in a production build it is the same
+ * one, and this handles both.
+ */
+export const API_DOCS_URL: string = import.meta.env.DEV
+  ? 'http://127.0.0.1:8000/docs'
+  : '/docs'
+
 export class ApiError extends Error {
   // Declared and assigned explicitly: TypeScript's `erasableSyntaxOnly` (on by
   // default in this Vite template) disallows constructor parameter properties.

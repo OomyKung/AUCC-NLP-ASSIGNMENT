@@ -20,10 +20,53 @@ def snapshot_path(video_id: str, directory: Path | None = None) -> Path:
     return base / f"{video_id}.jsonl"
 
 
-def write_snapshot(result: CollectResult, path: Path | None = None) -> Path:
-    """Write a collect result to a snapshot file and return its path."""
+class SnapshotWouldShrink(RuntimeError):
+    """Raised when writing a snapshot would discard already-collected messages."""
+
+
+def snapshot_message_count(path: Path) -> int | None:
+    """Messages recorded in an existing snapshot's header, if readable."""
+    if not path.is_file():
+        return None
+    try:
+        with open(path, encoding="utf-8") as handle:
+            header = json.loads(handle.readline() or "{}")
+    except (OSError, json.JSONDecodeError):
+        return None
+    stream = header.get("_stream")
+    if isinstance(stream, dict):
+        count = stream.get("message_count")
+        if isinstance(count, int):
+            return count
+    return None
+
+
+def write_snapshot(
+    result: CollectResult, path: Path | None = None, *, allow_shrink: bool = False
+) -> Path:
+    """Write a collect result to a snapshot file and return its path.
+
+    Refuses to replace an existing snapshot with a smaller one unless
+    ``allow_shrink`` is set. This guards against real data loss: re-importing the
+    same video with a lower ``--limit`` would otherwise silently overwrite a
+    large committed snapshot with a truncated one, discarding messages that can
+    no longer be re-collected once the stream's chat replay is gone. This
+    actually happened during development, costing 4,000 collected messages.
+
+    Raises:
+        SnapshotWouldShrink: when the new snapshot has fewer messages.
+    """
     target = path or snapshot_path(result.stream.video_id)
     target.parent.mkdir(parents=True, exist_ok=True)
+
+    if not allow_shrink:
+        existing = snapshot_message_count(target)
+        if existing is not None and result.count < existing:
+            raise SnapshotWouldShrink(
+                f"Refusing to overwrite {target.name}: it already holds {existing} "
+                f"messages and this import collected only {result.count}. "
+                "Collect with a higher limit, or pass allow_shrink=True to replace it."
+            )
 
     stream = result.stream
     header = {

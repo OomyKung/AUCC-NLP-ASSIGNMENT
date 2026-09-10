@@ -14,7 +14,7 @@ from app.services.chat_store import store_messages
 from app.services.collectors import AVAILABLE_COLLECTORS, CollectorError, get_collector
 from app.services.ingest import analyse_all_streams, analyse_stream
 from app.services.pipeline import get_pipeline
-from app.services.snapshot import list_snapshots, write_snapshot
+from app.services.snapshot import SnapshotWouldShrink, list_snapshots, write_snapshot
 
 router = APIRouter(tags=["analysis"])
 
@@ -130,7 +130,12 @@ def ingest_youtube(
 
     snapshot_name = None
     if payload.save_snapshot:
-        snapshot_name = write_snapshot(result).name
+        try:
+            snapshot_name = write_snapshot(result).name
+        except SnapshotWouldShrink as exc:
+            # The messages were still collected and stored; only the snapshot
+            # write was refused, so report it as a conflict the caller can fix.
+            raise HTTPException(409, str(exc)) from exc
 
     stored = store_messages(db, result)
 

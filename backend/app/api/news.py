@@ -39,13 +39,22 @@ def _apply_filters(
 ):
     """Apply the Explorer's filters to a select statement."""
     if search:
-        needle = f"%{search.strip()}%"
+        # `%` and `_` are LIKE wildcards. Without escaping, searching for a
+        # literal "%" matches every row, and "_" matches any single character --
+        # quietly wrong results rather than an error.
+        escaped = (
+            search.strip()
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        needle = f"%{escaped}%"
         # Search headline, body and summary so a keyword in the text is findable.
         query = query.where(
             or_(
-                NewsArticle.title.like(needle),
-                NewsArticle.content.like(needle),
-                NewsArticle.summary.like(needle),
+                NewsArticle.title.like(needle, escape="\\"),
+                NewsArticle.content.like(needle, escape="\\"),
+                NewsArticle.summary.like(needle, escape="\\"),
             )
         )
     if topic:

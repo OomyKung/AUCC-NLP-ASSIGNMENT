@@ -248,3 +248,83 @@ def test_file_collector_rejects_a_snapshot_with_no_messages(tmp_path):
 
     with pytest.raises(CollectorError, match="No readable chat messages"):
         FileCollector().collect(str(empty))
+
+
+# --------------------------------------------------------------------------
+# Snapshot write protection
+# --------------------------------------------------------------------------
+
+
+def test_snapshot_write_refuses_to_shrink(tmp_path, make_result):
+    """Overwriting a snapshot with fewer messages must be refused.
+
+    This is a regression test for real data loss during development: re-importing
+    a video with a lower limit silently replaced a 6,000-message committed
+    snapshot with a 2,000-message one, discarding 4,000 messages that could no
+    longer be re-collected once the stream's chat replay was gone.
+    """
+    from app.services.snapshot import SnapshotWouldShrink, write_snapshot
+
+    path = tmp_path / "shrinkTest1.jsonl"
+    write_snapshot(make_result(500, video_id="shrinkTest1"), path)
+
+    # Growing is fine.
+    write_snapshot(make_result(800, video_id="shrinkTest1"), path)
+    assert FileCollector().collect(str(path)).count == 800
+
+    # Shrinking is refused, and the existing file is left untouched.
+    with pytest.raises(SnapshotWouldShrink, match="already holds 800"):
+        write_snapshot(make_result(100, video_id="shrinkTest1"), path)
+    assert FileCollector().collect(str(path)).count == 800
+
+
+def test_snapshot_shrink_allowed_when_explicit(tmp_path, make_result):
+    from app.services.snapshot import write_snapshot
+
+    path = tmp_path / "shrinkTest2.jsonl"
+    write_snapshot(make_result(400, video_id="shrinkTest2"), path)
+    write_snapshot(make_result(50, video_id="shrinkTest2"), path, allow_shrink=True)
+
+    assert FileCollector().collect(str(path)).count == 50
+
+
+def test_snapshot_message_count_reads_the_header(tmp_path, make_result):
+    from app.services.snapshot import snapshot_message_count, write_snapshot
+
+    path = tmp_path / "headerTest.jsonl"
+    assert snapshot_message_count(path) is None  # missing file
+
+    write_snapshot(make_result(37, video_id="headerTest1"), path)
+    assert snapshot_message_count(path) == 37
+
+    # A corrupt header must not crash the guard; it degrades to "unknown".
+    path.write_text("not json at all\n", encoding="utf-8")
+    assert snapshot_message_count(path) is None
+
+
+def test_committed_snapshots_are_intact():
+    """Every committed snapshot's header count must match its actual rows.
+
+    A truncated snapshot is how the 4,000-message loss above went unnoticed, so
+    this asserts the committed data is complete.
+    """
+    from app.config import settings
+    from app.services.snapshot import list_snapshots
+
+    snapshots = list_snapshots()
+    if not snapshots:
+        pytest.skip("no committed snapshots in this checkout")
+
+    for summary in snapshots:
+        path = settings.chat_snapshot_dir / summary["file"]
+        lines = [
+            line
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        # One header line plus one line per message.
+        actual = len(lines) - 1
+        assert summary["message_count"] == actual, (
+            f"{summary['file']}: header says {summary['message_count']} "
+            f"but file holds {actual} messages"
+        )
