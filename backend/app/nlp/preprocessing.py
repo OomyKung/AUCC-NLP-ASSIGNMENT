@@ -41,7 +41,11 @@ _LAUGH_TOKEN = "555"
 _LAUGH_PLACEHOLDER = "\x00L\x00"
 
 # Repetition collapsing, applied in this order.
-_REPEAT_DIGIT = re.compile(r"(\d)\1{2,}")  # 11111 -> 1
+# Digit spam ("11111") collapses, but real numbers must not. The lookaround
+# requires the run to stand alone: it is not preceded or followed by another
+# digit or a separator. Without it, "250,000" became "250,0" and the year
+# "2000" became "20" -- corrupting every figure in a news article.
+_REPEAT_DIGIT = re.compile(r"(?<![\d,.])(\d)\1{2,}(?![\d,.])")
 # Collapse a letter repeated 3+ times down to a single one. Thai's legitimate
 # double consonants (ธรรม, กรรม, วรรณ) are always exactly two, so they are never
 # touched, while chat elongation (มากกกกก, สวยยยยย) collapses to the real word.
