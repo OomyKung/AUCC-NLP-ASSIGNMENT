@@ -80,9 +80,13 @@ class Settings(BaseSettings):
     collector: Literal["ytdlp", "youtube_api", "file"] = "ytdlp"
     youtube_api_key: str | None = None
 
-    # A chat window closes at whichever bound is hit first.
+    # A chat window closes at whichever bound is hit first. The message count
+    # is the bound that normally governs; the time bound is a safety valve that
+    # stops a quiet stream producing one enormous window. Real Thai news chat
+    # runs ~2 messages/minute, so a tight time bound would fire first and keep
+    # windows far below the intended size. Set minutes to 0 to disable it.
     chat_window_size: int = 200
-    chat_window_minutes: int = 5
+    chat_window_minutes: int = 60
     # Windows smaller than this are discarded as too thin to analyse.
     chat_window_min_messages: int = 5
 
