@@ -17,6 +17,7 @@ import {
   LoadingState,
   NewsCard,
   StatCard,
+  icons,
 } from '../components/ui'
 import { useAsync, useChartColors, useTheme } from '../hooks'
 import { api } from '../services/api'
@@ -75,28 +76,82 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* ---------------------------------------------------------- header */}
+      <section className="card animate-rise relative overflow-hidden p-6">
+        {/* Decorative wash. Purely cosmetic: no text sits on the saturated end,
+            so contrast is unchanged. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-[0.07] dark:opacity-[0.12]"
+          style={{
+            background:
+              'radial-gradient(60rem 20rem at 12% -20%, var(--chart-brand), transparent 60%),' +
+              'radial-gradient(40rem 18rem at 88% 120%, var(--chart-positive), transparent 60%)',
+          }}
+        />
+        <div className="relative">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+            ภาพรวมการวิเคราะห์
+          </h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300" lang="th">
+            วิเคราะห์แล้ว{' '}
+            <strong className="text-brand-700 dark:text-brand-300">
+              {data.total_news.toLocaleString()}
+            </strong>{' '}
+            เอกสาร จากข้อความแชทจริง{' '}
+            <strong className="text-brand-700 dark:text-brand-300">
+              {data.total_messages.toLocaleString()}
+            </strong>{' '}
+            ข้อความ ใน {data.total_streams} สตรีม
+          </p>
+        </div>
+      </section>
+
       {/* ------------------------------------------------------ stat cards */}
       <section
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
+        className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
         aria-label="สรุปภาพรวม"
       >
         <StatCard
           label="Total News"
           value={data.total_news}
+          icon={icons.documents}
           hint={`${data.chat_windows} ช่วงแชท · ${data.articles} บทความ`}
         />
-        <StatCard label="Positive" value={data.positive} tone="positive" hint="เชิงบวก" />
-        <StatCard label="Neutral" value={data.neutral} tone="neutral" hint="เป็นกลาง" />
-        <StatCard label="Negative" value={data.negative} tone="negative" hint="เชิงลบ" />
+        <StatCard
+          label="Positive"
+          value={data.positive}
+          tone="positive"
+          icon={icons.up}
+          share={data.total_news ? data.positive / data.total_news : 0}
+          hint={`เชิงบวก · ${pct(data.positive, data.total_news)}`}
+        />
+        <StatCard
+          label="Neutral"
+          value={data.neutral}
+          tone="neutral"
+          icon={icons.minus}
+          share={data.total_news ? data.neutral / data.total_news : 0}
+          hint={`เป็นกลาง · ${pct(data.neutral, data.total_news)}`}
+        />
+        <StatCard
+          label="Negative"
+          value={data.negative}
+          tone="negative"
+          icon={icons.down}
+          share={data.total_news ? data.negative / data.total_news : 0}
+          hint={`เชิงลบ · ${pct(data.negative, data.total_news)}`}
+        />
         <StatCard
           label="Most Common"
           value={data.most_common_topic_label ?? '—'}
+          icon={icons.tag}
           hint={`${data.most_common_topic_count.toLocaleString()} เอกสาร`}
         />
       </section>
 
       {/* Corpus context: makes the scale of the underlying data visible. */}
-      <section className="card flex flex-wrap items-center gap-x-8 gap-y-3 px-5 py-4 text-sm">
+      <section className="card animate-rise flex flex-wrap items-center gap-x-8 gap-y-3 px-5 py-4 text-sm">
         <Figure label="ข้อความแชททั้งหมด" value={data.total_messages.toLocaleString()} />
         <Figure label="วิเคราะห์ความรู้สึกแล้ว" value={data.scored_messages.toLocaleString()} />
         <Figure label="กรองเป็นสแปม" value={data.noise_messages.toLocaleString()} />
@@ -253,6 +308,12 @@ export default function Dashboard() {
       </section>
     </div>
   )
+}
+
+/** Percentage of a total, guarding against an empty corpus. */
+function pct(part: number, total: number): string {
+  if (!total) return '0%'
+  return `${Math.round((part / total) * 100)}%`
 }
 
 function Figure({ label, value }: { label: string; value: string }) {

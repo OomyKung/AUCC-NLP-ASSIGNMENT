@@ -112,7 +112,7 @@ export default function AppLayout() {
         aria-label="เมนูหลัก"
       >
         <div className="flex h-16 items-center gap-2.5 px-5">
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-sm shadow-brand-600/25">
             N
           </span>
           <div className="min-w-0">
@@ -132,7 +132,7 @@ export default function AppLayout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
                   isActive
-                    ? 'bg-brand-50 font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-300'
+                    ? 'bg-gradient-to-r from-brand-50 to-transparent font-medium text-brand-700 shadow-[inset_2px_0_0_0_var(--chart-brand)] dark:from-brand-500/15 dark:text-brand-300'
                     : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800/60'
                 }`
               }

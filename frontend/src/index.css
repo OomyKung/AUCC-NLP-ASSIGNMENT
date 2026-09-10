@@ -117,6 +117,38 @@
   }
 }
 
+@layer utilities {
+  /* Count-up and entrance animations. Both are disabled wholesale by the
+     prefers-reduced-motion block above, so they never fight accessibility. */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .animate-rise {
+    animation: rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Staggered entrance for grids of cards. Small delays only -- the last card
+     still lands in well under half a second. */
+  .stagger > * {
+    animation: rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .stagger > *:nth-child(1)  { animation-delay: 0.00s; }
+  .stagger > *:nth-child(2)  { animation-delay: 0.04s; }
+  .stagger > *:nth-child(3)  { animation-delay: 0.08s; }
+  .stagger > *:nth-child(4)  { animation-delay: 0.12s; }
+  .stagger > *:nth-child(5)  { animation-delay: 0.16s; }
+  .stagger > *:nth-child(6)  { animation-delay: 0.20s; }
+  .stagger > *:nth-child(n+7) { animation-delay: 0.24s; }
+}
+
 @layer components {
   .card {
     @apply bg-surface dark:bg-surface-dark rounded-2xl border border-slate-200/80
@@ -124,7 +156,34 @@
   }
 
   .card-hover {
-    @apply transition-shadow duration-200 hover:shadow-md;
+    /* A small lift on hover. Transform rather than a size change, so nothing
+       around it reflows. */
+    @apply transition-[box-shadow,transform] duration-200
+           hover:-translate-y-0.5 hover:shadow-lg hover:shadow-slate-900/5
+           dark:hover:shadow-black/20;
+  }
+
+  /* A coloured rail down the left edge of a card. Colour is set inline from the
+     topic palette; the topic name is always printed beside it, so the colour
+     enriches rather than carries the meaning. */
+  .card-rail {
+    @apply relative overflow-hidden;
+  }
+  .card-rail::before {
+    content: '';
+    @apply absolute inset-y-0 left-0 w-1;
+    background: var(--rail, transparent);
+  }
+
+  /* Tinted surface used behind stat figures. Very low alpha so text contrast
+     is unaffected -- checked against the same tokens as the flat surface. */
+  .tint {
+    background:
+      linear-gradient(
+        135deg,
+        color-mix(in oklab, var(--tint-color, transparent) 9%, transparent),
+        transparent 62%
+      );
   }
 
   .input {

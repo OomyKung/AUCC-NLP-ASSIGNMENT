@@ -1,0 +1,65 @@
+{
+  "split": {
+    "test_size": 0.2,
+    "random_state": 42
+  },
+  "negation": {
+    "negators protected (default)": {
+      "accuracy": 0.6733333333333333,
+      "f1_macro": 0.6126617047669679,
+      "fit_seconds": 0.4
+    },
+    "negators removed as stopwords": {
+      "accuracy": 0.68,
+      "f1_macro": 0.6251223313190475,
+      "fit_seconds": 0.2
+    }
+  },
+  "aggregation": {
+    "per-unit (majority vote)": {
+      "accuracy": 0.6733333333333333,
+      "f1_macro": 0.6745901261924055
+    },
+    "aggregated (whole document)": {
+      "accuracy": 0.7266666666666667,
+      "f1_macro": 0.7250708012317919
+    },
+    "units_per_document": 2.7
+  },
+  "features": {
+    "topic": {
+      "word only": {
+        "accuracy": 0.7066666666666667,
+        "f1_macro": 0.7006293038078384,
+        "fit_seconds": 0.3
+      },
+      "char only": {
+        "accuracy": 0.7133333333333334,
+        "f1_macro": 0.7123208246861495,
+        "fit_seconds": 0.5
+      },
+      "word + char (default)": {
+        "accuracy": 0.7266666666666667,
+        "f1_macro": 0.7250708012317919,
+        "fit_seconds": 0.9
+      }
+    },
+    "sentiment": {
+      "word only": {
+        "accuracy": 0.6733333333333333,
+        "f1_macro": 0.6126617047669679,
+        "fit_seconds": 0.2
+      },
+      "char only": {
+        "accuracy": 0.7533333333333333,
+        "f1_macro": 0.6966685544374144,
+        "fit_seconds": 0.3
+      },
+      "word + char (default)": {
+        "accuracy": 0.74,
+        "f1_macro": 0.6819093695382356,
+        "fit_seconds": 0.5
+      }
+    }
+  }
+}

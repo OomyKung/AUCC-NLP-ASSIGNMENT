@@ -139,6 +139,41 @@ export function useDebounced<T>(value: T, delay = 350): T {
   return debounced
 }
 
+/**
+ * Animate a number from 0 to `value` on mount.
+ *
+ * Returns the final value immediately when the user prefers reduced motion, so
+ * the figure is never withheld from someone who asked for less animation.
+ */
+export function useCountUp(value: number, duration = 650): number {
+  const [display, setDisplay] = useState(value)
+
+  useEffect(() => {
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+    if (reduced || !Number.isFinite(value)) {
+      setDisplay(value)
+      return
+    }
+
+    let frame = 0
+    const start = performance.now()
+    const tick = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1)
+      // Ease-out cubic: fast first, settles gently.
+      const eased = 1 - (1 - progress) ** 3
+      setDisplay(Math.round(value * eased))
+      if (progress < 1) frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [value, duration])
+
+  return display
+}
+
 /* -------------------------------------------------------------------------- */
 /* Toasts                                                                     */
 /* -------------------------------------------------------------------------- */

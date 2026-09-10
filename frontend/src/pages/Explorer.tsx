@@ -260,6 +260,50 @@ export default function Explorer() {
         </div>
       </section>
 
+      {/* Quick topic chips: faster than the dropdown, and they carry the same
+          colours as the cards and the chart so a category is recognisable
+          everywhere. The label is always present, so colour never carries the
+          meaning on its own. */}
+      {topics.data && topics.data.length > 0 && (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="กรองตามหมวดหมู่">
+          <button
+            type="button"
+            onClick={() => update('topic', '')}
+            aria-pressed={!topic}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              !topic
+                ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+            }`}
+          >
+            ทั้งหมด
+          </button>
+          {topics.data.map((item) => {
+            const active = topic === item.slug
+            return (
+              <button
+                key={item.slug}
+                type="button"
+                onClick={() => update('topic', active ? '' : item.slug)}
+                aria-pressed={active}
+                lang="th"
+                className="rounded-full px-3 py-1 text-xs font-medium transition-all hover:scale-[1.04]"
+                style={
+                  active
+                    ? { backgroundColor: item.color, color: '#fff' }
+                    : {
+                        backgroundColor: `color-mix(in oklab, ${item.color} 12%, transparent)`,
+                        color: item.color,
+                      }
+                }
+              >
+                {item.thai}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* --------------------------------------------------------- results */}
       {news.error ? (
         <ErrorState message={news.error} onRetry={news.reload} />
@@ -285,7 +329,7 @@ export default function Explorer() {
           </p>
 
           <div
-            className={`grid gap-4 md:grid-cols-2 xl:grid-cols-3 ${
+            className={`stagger grid gap-4 md:grid-cols-2 xl:grid-cols-3 ${
               news.loading ? 'opacity-60 transition-opacity' : ''
             }`}
           >

@@ -3,10 +3,12 @@
  *
  * Design decisions worth stating:
  *
- * - **Topic bars use ONE hue, not 15.** Identity comes from the axis label, so
- *   colouring each bar differently would add no information while breaking the
- *   fixed-order categorical rule (a 15-hue categorical set cannot stay
- *   colour-blind safe).
+ * - **Topic bars are coloured per category, but the axis label carries the
+ *   meaning.** A 15-hue categorical set could never be colour-blind safe if the
+ *   hue were the only way to tell series apart -- here every bar is named on the
+ *   axis and repeated in the tooltip, so colour is decoration over a label that
+ *   already identifies it. The same palette is reused for the card rails and
+ *   badges, so a topic looks the same everywhere.
  * - **Sentiment uses a diverging scale**: teal-green and red poles either side
  *   of a neutral gray midpoint, validated for colour-vision deficiency.
  * - **No dual axes anywhere.** Where two measures matter they get two charts.
@@ -116,7 +118,6 @@ export function TopicBarChart({
         />
         <Bar
           dataKey="count"
-          fill={colors.brand}
           radius={[0, 4, 4, 0]}
           maxBarSize={18}
           cursor={onSelect ? 'pointer' : undefined}
@@ -128,7 +129,11 @@ export function TopicBarChart({
                 }
               : undefined
           }
-        />
+        >
+          {rows.map((row) => (
+            <Cell key={row.key} fill={row.color || colors.brand} />
+          ))}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   )
@@ -164,9 +169,10 @@ export function SentimentDonut({
             data={rows}
             dataKey="count"
             nameKey="label"
-            innerRadius="58%"
-            outerRadius="82%"
+            innerRadius="56%"
+            outerRadius="84%"
             paddingAngle={2}
+            animationDuration={600}
             // A 2px surface-coloured gap separates adjacent fills.
             stroke={colors.surface}
             strokeWidth={2}
@@ -331,6 +337,7 @@ export function TrendChart({
         {series.map((item) => (
           <Line
             key={item.key}
+            animationDuration={700}
             type="monotone"
             dataKey={item.key}
             name={item.name}

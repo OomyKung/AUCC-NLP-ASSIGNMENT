@@ -9,7 +9,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { Keyword, NewsListItem, SentimentSlug } from '../types'
-import { dismissToast, useToasts } from '../hooks'
+import { dismissToast, useCountUp, useToasts } from '../hooks'
 
 /* -------------------------------------------------------------------------- */
 /* Badges                                                                     */
@@ -134,43 +134,118 @@ export function StatCard({
   hint,
   tone = 'brand',
   icon,
+  share,
 }: {
   label: string
   value: string | number
   hint?: string
   tone?: 'brand' | SentimentSlug
   icon?: ReactNode
+  /** 0..1 - draws a share bar under the figure, for proportions. */
+  share?: number
 }) {
-  const accent =
-    tone === 'brand'
-      ? 'text-brand-600 dark:text-brand-400'
-      : tone === 'positive'
-        ? 'text-positive'
-        : tone === 'negative'
-          ? 'text-negative'
-          : 'text-neutral dark:text-slate-400'
+  const numeric = typeof value === 'number' ? value : null
+  const animated = useCountUp(numeric ?? 0)
+
+  const palette = {
+    brand: {
+      text: 'text-brand-700 dark:text-brand-300',
+      chip: 'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300',
+      bar: 'bg-brand-500',
+      color: 'var(--chart-brand)',
+    },
+    positive: {
+      text: 'text-teal-700 dark:text-teal-300',
+      chip: 'bg-teal-50 text-positive dark:bg-teal-500/15 dark:text-teal-300',
+      bar: 'bg-positive',
+      color: 'var(--chart-positive)',
+    },
+    neutral: {
+      text: 'text-slate-700 dark:text-slate-300',
+      chip: 'bg-slate-100 text-neutral dark:bg-slate-500/15 dark:text-slate-300',
+      bar: 'bg-neutral',
+      color: 'var(--chart-neutral)',
+    },
+    negative: {
+      text: 'text-red-700 dark:text-red-300',
+      chip: 'bg-red-50 text-negative dark:bg-red-500/15 dark:text-red-300',
+      bar: 'bg-negative',
+      color: 'var(--chart-negative)',
+    },
+  }[tone]
 
   return (
-    <div className="card card-hover p-5">
+    <div
+      className="card card-hover tint p-5"
+      style={{ ['--tint-color' as string]: palette.color }}
+    >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           {label}
         </p>
-        {icon && <span className={accent}>{icon}</span>}
+        {icon && (
+          <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${palette.chip}`}>
+            {icon}
+          </span>
+        )}
       </div>
+
       <p
-        className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${accent}`}
+        className={`mt-2 text-3xl font-semibold tabular-nums tracking-tight ${palette.text}`}
         lang="th"
       >
-        {typeof value === 'number' ? value.toLocaleString() : value}
+        {numeric !== null ? animated.toLocaleString() : value}
       </p>
+
+      {share !== undefined && (
+        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700/60">
+          <div
+            className={`h-full rounded-full ${palette.bar} transition-[width] duration-700`}
+            style={{ width: `${Math.max(0, Math.min(1, share)) * 100}%` }}
+          />
+        </div>
+      )}
+
       {hint && (
-        <p className="mt-1 text-xs text-slate-400" lang="th">
+        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400" lang="th">
           {hint}
         </p>
       )}
     </div>
   )
+}
+
+/** Small inline icons for the stat cards. */
+export const icons = {
+  documents: (
+    <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M7 3h7l5 5v13H7z" strokeLinejoin="round" />
+      <path d="M14 3v5h5M10 13h6M10 17h6" strokeLinecap="round" />
+    </svg>
+  ),
+  up: (
+    <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <path d="M4 15l6-6 4 4 6-6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15 7h5v5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  minus: (
+    <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <path d="M5 12h14" strokeLinecap="round" />
+    </svg>
+  ),
+  down: (
+    <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <path d="M4 9l6 6 4-4 6 6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15 17h5v-5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  tag: (
+    <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M3 12V4h8l9 9-8 8z" strokeLinejoin="round" />
+      <circle cx="7.5" cy="7.5" r="1.4" />
+    </svg>
+  ),
 }
 
 export function ChartCard({
@@ -227,7 +302,12 @@ export function NewsCard({
   sentimentLabel: string
 }) {
   return (
-    <article className="card card-hover flex flex-col p-5">
+    <article
+      className="card card-rail card-hover flex flex-col p-5 pl-6"
+      // The rail repeats the topic colour down the card edge. The topic name is
+      // printed in the badge beside it, so this is decoration, not the signal.
+      style={topicColor ? ({ ['--rail' as string]: topicColor }) : undefined}
+    >
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <TopicBadge label={topicLabel} color={topicColor} />
         <SentimentBadge
@@ -260,7 +340,17 @@ export function NewsCard({
           {item.keywords.slice(0, 6).map((keyword: Keyword) => (
             <li
               key={keyword.word}
-              className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+              className="rounded-md px-1.5 py-0.5 text-[11px] font-medium transition-colors"
+              style={
+                topicColor
+                  ? {
+                      // 12% tint of the topic colour keeps the chip legible in
+                      // both themes while tying it to the category.
+                      backgroundColor: `color-mix(in oklab, ${topicColor} 12%, transparent)`,
+                      color: topicColor,
+                    }
+                  : undefined
+              }
               lang="th"
             >
               {keyword.word}
@@ -313,7 +403,7 @@ export function LoadingState({ rows = 3, label }: { rows?: number; label?: strin
 export function ChartSkeleton({ height = 260 }: { height?: number }) {
   return (
     <div
-      className="animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/60"
+      className="animate-pulse rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800/70 dark:to-slate-800/30"
       style={{ height }}
       role="status"
       aria-label="กำลังโหลดกราฟ"
@@ -332,7 +422,7 @@ export function EmptyState({
 }) {
   return (
     <div className="card flex flex-col items-center gap-2 px-6 py-14 text-center">
-      <div className="mb-1 grid size-11 place-items-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800">
+      <div className="mb-1 grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-brand-50 to-brand-100 text-brand-500 dark:from-brand-500/15 dark:to-brand-500/5 dark:text-brand-300">
         <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8">
           <circle cx="11" cy="11" r="7" />
           <path d="m20 20-3.5-3.5" strokeLinecap="round" />
@@ -502,10 +592,18 @@ export function KeywordCloud({
               disabled={!onSelect}
               title={`${item.word} · ${item.count} เอกสาร`}
               lang="th"
-              className={`rounded-md leading-tight text-slate-700 tabular-nums dark:text-slate-200 ${
-                onSelect ? 'hover:text-brand-600 dark:hover:text-brand-400' : 'cursor-default'
+              className={`rounded-md leading-tight tabular-nums transition-colors ${
+                onSelect
+                  ? 'hover:text-brand-600 dark:hover:text-brand-400'
+                  : 'cursor-default'
               }`}
-              style={{ fontSize: `${size}rem`, opacity: 0.55 + weight * 0.45 }}
+              style={{
+                fontSize: `${size}rem`,
+                // Size AND weight AND depth of colour all encode frequency, so
+                // the ranking survives for anyone who struggles with one of them.
+                fontWeight: 400 + Math.round(weight * 3) * 100,
+                color: `color-mix(in oklab, var(--chart-brand) ${35 + weight * 65}%, var(--chart-ink))`,
+              }}
             >
               {item.word}
             </button>
