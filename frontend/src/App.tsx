@@ -28,7 +28,16 @@ export default function App() {
           fetch('/api/health'),
           fetch('/api/topics'),
         ])
-        if (!h.ok || !t.ok) throw new Error(`API returned ${h.status}/${t.status}`)
+        for (const response of [h, t]) {
+          if (response.ok) continue
+          // The dev proxy answers 503 with a `detail` explaining how to start
+          // the backend; prefer that over a bare status code.
+          const detail = await response
+            .json()
+            .then((body) => body?.detail as string | undefined)
+            .catch(() => undefined)
+          throw new Error(detail ?? `${response.url} returned ${response.status}`)
+        }
         setHealth(await h.json())
         setTopics(await t.json())
       } catch (err) {
@@ -52,12 +61,7 @@ export default function App() {
       {error && (
         <div className="card border-negative/30 bg-negative-soft/60 p-4 dark:bg-negative/10">
           <p className="font-medium text-negative">Cannot reach the API</p>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            {error} &mdash; start the backend with{' '}
-            <code className="rounded bg-slate-200 px-1.5 py-0.5 text-xs dark:bg-slate-700">
-              uvicorn app.main:app --reload
-            </code>
-          </p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{error}</p>
         </div>
       )}
 
