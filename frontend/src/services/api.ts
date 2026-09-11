@@ -177,6 +177,9 @@ export const api = {
     limit?: number
     save_snapshot?: boolean
     analyse?: boolean
+    /** 'auto' analyses the audio only when the video has no chat. */
+    transcript?: 'auto' | 'always' | 'never'
+    with_frames?: boolean
   }) =>
     request<IngestResult>('/ingest/youtube', {
       method: 'POST',

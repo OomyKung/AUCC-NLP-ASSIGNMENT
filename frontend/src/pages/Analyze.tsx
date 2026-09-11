@@ -39,7 +39,7 @@ export default function Analyze() {
           Analyze News
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400" lang="th">
-          วางข้อความข่าวภาษาไทย หรือนำเข้าแชทสดจาก YouTube เพื่อวิเคราะห์
+          วางข้อความข่าวภาษาไทย หรือนำเข้าคลิปข่าวจาก YouTube (แชทหรือเสียงพูดก็ได้) เพื่อวิเคราะห์
         </p>
       </header>
 
@@ -386,6 +386,10 @@ function YouTubeImportPanel() {
   const [collector, setCollector] = useState<'ytdlp' | 'file'>('ytdlp')
   const [limit, setLimit] = useState('2000')
   const [saveSnapshot, setSaveSnapshot] = useState(true)
+  // Analysing the spoken content is a *fallback* by default: a four-hour
+  // programme takes minutes, and most imports only want the chat. Ticking this
+  // asks for it even when chat was collected.
+  const [withSpeech, setWithSpeech] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<IngestResult | null>(null)
@@ -402,10 +406,16 @@ function YouTubeImportPanel() {
         limit: limit ? Number(limit) : undefined,
         save_snapshot: collector === 'ytdlp' && saveSnapshot,
         analyse: true,
+        transcript: withSpeech ? 'always' : 'auto',
       })
       setResult(response)
       notify(
-        `นำเข้า ${response.stored.toLocaleString()} ข้อความ · สร้าง ${response.windows_created} ช่วงแชท`,
+        response.chat_available
+          ? `นำเข้า ${response.stored.toLocaleString()} ข้อความ · สร้าง ${response.windows_created} ช่วงแชท` +
+              (response.segments_created
+                ? ` · แบ่งข่าว ${response.segments_created} ช่วง`
+                : '')
+          : `คลิปนี้ไม่มีแชท · วิเคราะห์จากเสียงพูดได้ ${response.segments_created} ช่วงข่าว`,
         'success',
       )
       snapshots.reload()
@@ -423,11 +433,14 @@ function YouTubeImportPanel() {
     <div className="space-y-4">
       <form onSubmit={submit} className="card space-y-3 p-5">
         <h3 className="font-semibold text-slate-900 dark:text-white">
-          นำเข้าแชทสดจาก YouTube
+          นำเข้าคลิปข่าวจาก YouTube
         </h3>
         <p className="text-xs text-slate-500 dark:text-slate-400" lang="th">
           ใช้ yt-dlp ดึงแชท (ทั้งสตรีมสดและย้อนหลัง) โดยไม่ต้องใช้ API key
           หรือเลือกเล่นซ้ำจากไฟล์ที่บันทึกไว้แบบออฟไลน์
+          <span className="mt-1 block">
+            คลิปที่ปิดแชทก็ใช้ได้ — ระบบจะถอดเสียงในคลิปมาแบ่งช่วงข่าวให้แทนโดยอัตโนมัติ
+          </span>
         </p>
 
         <div
@@ -518,6 +531,24 @@ function YouTubeImportPanel() {
           )}
         </div>
 
+        {collector === 'ytdlp' && (
+          <label className="flex items-start gap-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-900/40 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={withSpeech}
+              onChange={(event) => setWithSpeech(event.target.checked)}
+              className="mt-0.5 size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-400"
+            />
+            <span lang="th">
+              วิเคราะห์เสียงพูดในคลิปด้วย (ถอดเสียง → แบ่งช่วงข่าว → ไทม์ไลน์)
+              <span className="mt-0.5 block text-xs text-slate-400">
+                คลิปที่ปิดแชทจะใช้วิธีนี้อัตโนมัติอยู่แล้ว ติ๊กไว้เมื่อต้องการทั้งแชทและเนื้อข่าว
+                · คลิปยาวอาจใช้เวลาหลายนาที
+              </span>
+            </span>
+          </label>
+        )}
+
         <button
           type="submit"
           disabled={busy || !source.trim()}
@@ -527,7 +558,9 @@ function YouTubeImportPanel() {
         </button>
         {busy && collector === 'ytdlp' && (
           <p className="text-center text-xs text-slate-400" lang="th">
-            การดึงแชทจาก YouTube อาจใช้เวลาหลายสิบวินาที
+            {withSpeech
+              ? 'ถอดเสียงและแบ่งช่วงข่าวทั้งรายการ อาจใช้เวลาหลายนาที'
+              : 'การดึงแชทจาก YouTube อาจใช้เวลาหลายสิบวินาที'}
           </p>
         )}
       </form>
@@ -542,20 +575,76 @@ function YouTubeImportPanel() {
           <p className="text-xs text-slate-400" lang="th">
             {result.channel} · {result.is_live ? 'กำลังถ่ายทอดสด' : 'ย้อนหลัง'}
           </p>
-          <dl className="grid grid-cols-2 gap-2 pt-2 sm:grid-cols-3">
-            <Stat label="เก็บได้" value={result.collected} />
-            <Stat label="บันทึกใหม่" value={result.stored} />
-            <Stat label="ซ้ำ (ข้าม)" value={result.duplicates} />
-            <Stat label="ช่วงแชท" value={result.windows_created} />
-            <Stat label="วิเคราะห์" value={result.messages_scored} />
-            <Stat label="กรองสแปม" value={result.messages_skipped_noise} />
-          </dl>
+          {result.chat_available ? (
+            <dl className="grid grid-cols-2 gap-2 pt-2 sm:grid-cols-3">
+              <Stat label="เก็บได้" value={result.collected} />
+              <Stat label="บันทึกใหม่" value={result.stored} />
+              <Stat label="ซ้ำ (ข้าม)" value={result.duplicates} />
+              <Stat label="ช่วงแชท" value={result.windows_created} />
+              <Stat label="วิเคราะห์" value={result.messages_scored} />
+              <Stat label="กรองสแปม" value={result.messages_skipped_noise} />
+            </dl>
+          ) : (
+            /* Not an error: a news channel that switches chat replay off after
+               the broadcast still published everything the newsreader said. */
+            <p
+              className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-500/10 dark:text-amber-200"
+              lang="th"
+            >
+              คลิปนี้ไม่มีแชทให้เก็บ (ช่องข่าวมักปิดแชทย้อนหลังหลังจบรายการ)
+              จึงวิเคราะห์จากเสียงพูดในคลิปแทน
+            </p>
+          )}
+
+          {result.segments_created > 0 && (
+            <>
+              <dl className="grid grid-cols-2 gap-2 pt-2 sm:grid-cols-3">
+                <Stat label="ช่วงข่าว" value={result.segments_created} />
+                <Stat label="ภาพนิ่ง" value={result.frames_captured} />
+              </dl>
+              {result.transcript_source && (
+                <p className="text-xs text-slate-400">
+                  ถอดเสียงจาก: {result.transcript_source}
+                </p>
+              )}
+              {result.headlines_cached === 0 && (
+                /* Writing a headline takes ~20s per story, which is far longer
+                   than a request should hold -- so the import uses the
+                   extractive headline and points at the command that upgrades
+                   it, rather than silently looking worse than the shipped
+                   timelines. */
+                <p className="text-xs text-slate-400" lang="th">
+                  พาดหัวช่วงข่าวมาจากการตัดข้อความจริงในคลิป · อยากได้พาดหัวที่ AI
+                  เขียนให้ ใช้คำสั่ง{' '}
+                  <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">
+                    python analyse_video.py {result.video_id}
+                  </code>
+                </p>
+              )}
+            </>
+          )}
+
+          {result.transcript_note && (
+            <p className="text-xs text-slate-400" lang="th">
+              เสียงพูด: {result.transcript_note}
+            </p>
+          )}
+
           {result.snapshot && (
             <p className="pt-1 text-xs text-slate-400">snapshot: {result.snapshot}</p>
           )}
-          <Link to="/" className="btn-ghost mt-2 w-full">
-            ดูผลบนแดชบอร์ด →
-          </Link>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {result.chat_available && (
+              <Link to="/" className="btn-ghost w-full">
+                ดูผลบนแดชบอร์ด →
+              </Link>
+            )}
+            {result.segments_created > 0 && (
+              <Link to="/timeline" className="btn-ghost w-full">
+                ดูไทม์ไลน์ข่าว →
+              </Link>
+            )}
+          </div>
         </div>
       )}
 

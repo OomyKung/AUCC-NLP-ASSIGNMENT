@@ -212,6 +212,19 @@ export interface IngestResult {
   messages_scored: number
   messages_skipped_noise: number
   snapshot: string | null
+  /**
+   * The two halves are reported separately because either can succeed alone: a
+   * video with chat switched off still has a transcript, and a video with no
+   * captions still has chat.
+   */
+  chat_available: boolean
+  chat_note: string
+  segments_created: number
+  frames_captured: number
+  transcript_source: string | null
+  transcript_note: string
+  /** Stories whose headline was written by the LLM on an earlier run. */
+  headlines_cached: number
 }
 
 export interface SnapshotInfo {

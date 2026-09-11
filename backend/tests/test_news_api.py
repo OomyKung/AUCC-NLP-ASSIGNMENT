@@ -424,6 +424,208 @@ def test_ingest_reports_a_missing_snapshot_as_a_client_error(api):
     assert "not found" in response.json()["detail"].lower()
 
 
+# --------------------------------------------------------------------------
+# A video with no chat is still a video
+#
+# News channels routinely switch chat replay off once a broadcast ends. That
+# used to fail the whole import, even though the programme's own audio was still
+# there to transcribe, segment and put on the timeline.
+# --------------------------------------------------------------------------
+
+
+def _fake_collector(exc: Exception):
+    class _Collector:
+        name = "fake"
+
+        def collect(self, source, *, limit=None):
+            raise exc
+
+    return lambda name=None: _Collector()
+
+
+def _fake_broadcast(**overrides):
+    from app.services.broadcast import BroadcastResult
+
+    defaults = dict(
+        video_id="noChatVid01",
+        source="youtube-asr:th-orig",
+        duration_ms=3_600_000,
+        cue_count=1_200,
+        segment_count=14,
+        frames_captured=14,
+    )
+    defaults.update(overrides)
+    return BroadcastResult(**defaults)
+
+
+def test_a_video_with_no_chat_still_gets_its_spoken_content_analysed(api, monkeypatch):
+    from app.api import analyze
+    from app.services.collectors.base import ChatUnavailable, StreamInfo
+
+    info = StreamInfo(
+        video_id="noChatVid01",
+        url="https://www.youtube.com/watch?v=noChatVid01",
+        title="ข่าวเช้าวันนี้",
+        channel="ช่องข่าว",
+    )
+    monkeypatch.setattr(
+        analyze,
+        "get_collector",
+        _fake_collector(ChatUnavailable("No live chat available.", stream=info)),
+    )
+    calls = []
+
+    def fake_analyse_video(db, source, **kwargs):
+        calls.append(kwargs)
+        return _fake_broadcast()
+
+    monkeypatch.setattr(analyze, "analyse_video", fake_analyse_video)
+
+    response = api.post("/api/ingest/youtube", json={"source": "noChatVid01"})
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["chat_available"] is False
+    assert "No live chat" in body["chat_note"]
+    assert body["segments_created"] == 14
+    assert body["stored"] == 0
+    # The metadata request had already succeeded, so the fallback is not
+    # analysing a nameless video.
+    assert body["title"] == "ข่าวเช้าวันนี้"
+    assert body["channel"] == "ช่องข่าว"
+    # And it must not spend 20 seconds a story writing headlines inside a
+    # request: cached ones are reused, new ones are left to analyse_video.py.
+    assert calls and calls[0]["allow_model"] is False
+
+
+def test_a_video_with_neither_chat_nor_captions_is_an_error(api, monkeypatch):
+    from app.api import analyze
+    from app.services.collectors.base import ChatUnavailable
+    from app.services.transcripts import TranscriptUnavailable
+
+    monkeypatch.setattr(
+        analyze, "get_collector", _fake_collector(ChatUnavailable("No live chat."))
+    )
+
+    def no_captions(db, source, **kwargs):
+        raise TranscriptUnavailable("No Thai captions for this video.")
+
+    monkeypatch.setattr(analyze, "analyse_video", no_captions)
+
+    response = api.post("/api/ingest/youtube", json={"source": "emptyVid001"})
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    # Both reasons, because the caller needs to know both were tried.
+    assert "No live chat." in detail
+    assert "No Thai captions" in detail
+
+
+def test_a_real_collection_failure_is_not_retried_as_a_transcript(api, monkeypatch):
+    """A private or removed video is a failure of the video itself. Falling back
+    would turn one clear error into two confusing ones."""
+    from app.api import analyze
+    from app.services.collectors.base import CollectorError
+
+    monkeypatch.setattr(
+        analyze, "get_collector", _fake_collector(CollectorError("This video is private."))
+    )
+
+    def must_not_run(db, source, **kwargs):
+        raise AssertionError("the transcript was attempted on a private video")
+
+    monkeypatch.setattr(analyze, "analyse_video", must_not_run)
+
+    response = api.post("/api/ingest/youtube", json={"source": "privateVid1"})
+    assert response.status_code == 400
+    assert "private" in response.json()["detail"]
+
+
+def test_transcript_never_means_never(api, monkeypatch):
+    from app.api import analyze
+    from app.services.collectors.base import ChatUnavailable
+
+    monkeypatch.setattr(
+        analyze, "get_collector", _fake_collector(ChatUnavailable("No live chat."))
+    )
+
+    def must_not_run(db, source, **kwargs):
+        raise AssertionError("transcript ran with transcript='never'")
+
+    monkeypatch.setattr(analyze, "analyse_video", must_not_run)
+
+    response = api.post(
+        "/api/ingest/youtube", json={"source": "noChatVid01", "transcript": "never"}
+    )
+    assert response.status_code == 400
+
+
+def test_transcript_always_runs_alongside_a_successful_chat_import(
+    api, monkeypatch, make_messages
+):
+    """Both halves at once: the chat windows and the story timeline describe the
+    same video from two different sources."""
+    from app.api import analyze
+    from app.services.collectors.base import CollectResult, StreamInfo
+
+    class _Collector:
+        name = "fake"
+
+        def collect(self, source, *, limit=None):
+            return CollectResult(
+                stream=StreamInfo(
+                    video_id="bothVid0001",
+                    url="https://www.youtube.com/watch?v=bothVid0001",
+                    title="ทั้งสองแบบ",
+                ),
+                messages=make_messages(12),
+            )
+
+    monkeypatch.setattr(analyze, "get_collector", lambda name=None: _Collector())
+    monkeypatch.setattr(
+        analyze, "analyse_video", lambda db, source, **kwargs: _fake_broadcast(segment_count=9)
+    )
+
+    response = api.post(
+        "/api/ingest/youtube",
+        json={"source": "bothVid0001", "transcript": "always", "save_snapshot": False},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["chat_available"] is True
+    assert body["stored"] == 12
+    assert body["segments_created"] == 9
+
+
+def test_a_chat_import_does_not_transcribe_by_default(api, monkeypatch, make_messages):
+    """'auto' is a fallback, not an addition: a four-hour programme would
+    otherwise hold the request open for minutes nobody asked for."""
+    from app.api import analyze
+    from app.services.collectors.base import CollectResult, StreamInfo
+
+    class _Collector:
+        name = "fake"
+
+        def collect(self, source, *, limit=None):
+            return CollectResult(
+                stream=StreamInfo(
+                    video_id="chatVid0001",
+                    url="https://www.youtube.com/watch?v=chatVid0001",
+                ),
+                messages=make_messages(5),
+            )
+
+    monkeypatch.setattr(analyze, "get_collector", lambda name=None: _Collector())
+
+    def must_not_run(db, source, **kwargs):
+        raise AssertionError("transcript ran when chat had already succeeded")
+
+    monkeypatch.setattr(analyze, "analyse_video", must_not_run)
+
+    response = api.post("/api/ingest/youtube", json={"source": "chatVid0001"})
+    assert response.status_code == 200
+    assert response.json()["segments_created"] == 0
+
+
 def test_reanalyse_unknown_stream_is_404(api):
     assert (
         api.post("/api/ingest/reanalyse", json={"stream_id": 987654}).status_code == 404

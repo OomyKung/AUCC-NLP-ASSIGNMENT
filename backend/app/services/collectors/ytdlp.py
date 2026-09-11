@@ -18,6 +18,7 @@ from pathlib import Path
 
 from app.config import settings
 from app.services.collectors.base import (
+    ChatUnavailable,
     CollectorError,
     CollectResult,
     StreamInfo,
@@ -127,16 +128,18 @@ class YtDlpCollector:
         with tempfile.TemporaryDirectory(prefix="thainews-chat-") as tmp:
             chat_path = self._download_chat(url, Path(tmp))
             if chat_path is None:
-                raise CollectorError(
+                raise ChatUnavailable(
                     "No live chat available for this video. Live chat must be enabled, "
                     "and finished streams only keep a chat replay if the uploader left "
-                    "it on. Try a different stream, or import a saved snapshot instead."
+                    "it on.",
+                    stream=stream,
                 )
             messages = parse_chat_file(chat_path, limit=limit)
 
         if not messages:
-            raise CollectorError(
-                "The chat track downloaded but contained no readable messages."
+            raise ChatUnavailable(
+                "The chat track downloaded but contained no readable messages.",
+                stream=stream,
             )
 
         messages.sort(key=lambda m: m.published_at)

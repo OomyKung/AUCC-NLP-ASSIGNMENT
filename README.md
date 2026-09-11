@@ -243,6 +243,35 @@ Running our own ASR is supported and off by default: `TRANSCRIPT_BACKEND=whisper
 gives better provenance for a paper at the cost of hours of CPU per programme and
 ~2 GB of dependencies.
 
+#### A video with no chat is still a video
+
+Thai news channels routinely switch chat replay off once a broadcast ends, and
+the import used to fail outright on those — reporting *"No live chat available
+for this video"* even though YouTube still had every word the newsreader said.
+
+Chat and transcript are two independent sources of evidence about the same
+video, so the import now treats them that way:
+
+| | chat | transcript | result |
+|---|---|---|---|
+| Live stream with chat on | ✔ | on request | chat windows, and a timeline if asked |
+| Finished broadcast, chat replay off | ✖ | ✔ automatically | full story timeline, chat reported as absent |
+| Private or removed video | ✖ | ✖ | the one real failure — a 400 with both reasons |
+
+Only a video with *neither* is an error. Measured on the case that prompted
+this, Thai PBS `ข่าวค่ำ | 10 ก.ย. 69` with chat disabled: **56 stories and 56
+frames in 151 seconds**, title and channel intact — the metadata request had
+already succeeded before the chat download failed, so `ChatUnavailable` carries
+the `StreamInfo` rather than discarding it.
+
+Analysing the audio is a *fallback* by default, not an addition: a four-hour
+programme takes minutes, and a chat import that already succeeded should not
+pay for that uninvited. The import form has a checkbox to ask for both.
+
+Headlines are the exception to "do everything in the request" — writing one
+takes about 20 seconds, so an imported video gets extractive headlines and the
+UI names the command that upgrades them (`python analyse_video.py <video id>`).
+
 #### Finding where one story ends and the next begins
 
 Three independent signals, combined — and every boundary records which ones fired,
@@ -1076,7 +1105,7 @@ Interactive docs: <http://127.0.0.1:8000/docs>
 | GET | `/api/broadcast/segments` | Detected stories, filterable by video or topic |
 | POST | `/api/broadcast/analyse` | Transcribe a video and split it into stories (reuses cached headlines; pass `write_headlines` to let the model write new ones, which takes ~20s per story) |
 | GET | `/media/frames/{video_id}/{sec}.jpg` | Frame captured at a story's start |
-| POST | `/api/ingest/youtube` | Collect + analyse a stream's chat |
+| POST | `/api/ingest/youtube` | Analyse a video: its chat, its spoken content, or both. A video with chat switched off falls back to the transcript rather than failing |
 | GET | `/api/ingest/snapshots` | Offline snapshots available |
 | POST | `/api/ingest/reanalyse` | Re-run the pipeline (after swapping a model) |
 

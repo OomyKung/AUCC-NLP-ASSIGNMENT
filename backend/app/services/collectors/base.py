@@ -23,6 +23,7 @@ class CollectorError(RuntimeError):
     """
 
 
+
 @dataclass(slots=True)
 class RawChatMessage:
     """One chat message, normalised across collectors."""
@@ -45,6 +46,24 @@ class StreamInfo:
     channel: str | None = None
     is_live: bool = False
     collector: str = "unknown"
+
+
+class ChatUnavailable(CollectorError):
+    """The video is fine; it just has no chat to collect.
+
+    Distinguished from every other collection failure because it is not really a
+    failure of the *video*: news channels routinely turn chat replay off once a
+    broadcast ends, and the programme is still fully analysable from what the
+    newsreader said. The caller can fall back to the transcript.
+
+    Carries the :class:`StreamInfo` already fetched, because the metadata
+    request succeeded -- the title and channel are known, and throwing them away
+    would leave the fallback analysing a nameless video.
+    """
+
+    def __init__(self, message: str, stream: StreamInfo | None = None) -> None:
+        super().__init__(message)
+        self.stream = stream
 
 
 @dataclass(slots=True)

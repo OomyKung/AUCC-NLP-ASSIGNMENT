@@ -10,6 +10,7 @@ from __future__ import annotations
 from app.config import settings
 from app.services.collectors.base import (
     ChatCollector,
+    ChatUnavailable,
     CollectorError,
     CollectResult,
     RawChatMessage,
@@ -48,6 +49,7 @@ __all__ = [
     "AVAILABLE_COLLECTORS",
     "ChatCollector",
     "CollectResult",
+    "ChatUnavailable",
     "CollectorError",
     "FileCollector",
     "RawChatMessage",
