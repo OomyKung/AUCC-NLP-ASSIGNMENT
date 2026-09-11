@@ -457,6 +457,47 @@ inflate every metric downstream.
 News/Sport, ข่าวช่อง8, เรื่องเล่าเช้านี้, บิ๊กแชมป์ FC). Committed so the
 project is reproducible and demonstrable with no network access.
 
+### Privacy: this is real people's data
+
+The chat is real, written by 5,706 real accounts, and much of it is political
+opinion. This repository is public, so no handle is published. `anonymise.py`
+replaces every one with a stable keyed hash (blake2s, 4-byte digest — short
+enough to read, long enough that the expected collision count across 5,706
+handles is ~0.004, because a collision would merge two speakers).
+
+Handles appear in **two** places, and the second is the one that is easy to miss:
+
+| Location | Example | Becomes |
+|---|---|---|
+| `author` field | `@thairathnews` | `ผู้ชม #3b9ebd90` |
+| `@mention` inside message text | `@thairathnews ครับ` | `@viewer-3b9ebd90 ครับ` |
+
+An earlier version of the script handled only the author field, which left 98
+raw handles inside message text — viewers replying to each other by name. Both
+are now covered, keyed identically, so a mention of someone who also posts
+resolves to that poster's pseudonym and the reply structure of the conversation
+survives.
+
+Two properties worth stating precisely:
+
+- **No analysis result depends on this.** The author field never reaches the
+  pipeline, and `clean_text` strips `@[\w.\-]+` before tokenisation, so the raw
+  handle was never a feature. The mention pseudonym is deliberately ASCII so the
+  *same* regex removes it completely — verified to produce identical cleaned text
+  and identical tokens. A Thai pseudonym would not work here: `\w` stops at Thai
+  combining marks and would leave fragments like `ชม` to pollute keywords.
+- **It is enforced, not just documented.** `tests/test_privacy.py` scans the
+  committed snapshots for raw handles, emails and phone-shaped digit runs, and
+  fails the build if any appear. The digit check requires four distinct digits in
+  a run, because `5555555555` is Thai laughter, not a phone number.
+
+```powershell
+python anonymise.py --check     # report what would change
+python anonymise.py             # rewrite snapshots and the database
+```
+
+The transformation is idempotent, so it is safe to run before every commit.
+
 ### The 15 categories
 
 | | | | |
@@ -641,7 +682,7 @@ failure, so the application never breaks without a key.
 ## Testing
 
 ```powershell
-cd backend  && python -m pytest      # 230 tests
+cd backend  && python -m pytest      # 242 tests
 cd frontend && npm run test          # 13 rendering tests
 ```
 
