@@ -97,7 +97,31 @@ uvicorn app.main:app --reload
 articles plus 27,928 real Thai chat messages from seven streams, analysed into
 126 windows, and rebuilds the story timelines from the committed transcript
 snapshots. It needs no network access — verified by running the rebuild with
-sockets disabled.
+sockets disabled — and **no language model**: the written headlines ship in
+`data/enrichments/`, so the seed reuses them instead of regenerating them.
+
+That only holds while the configured model matches the one that wrote them
+(`qwen2.5:7b`). Point `OLLAMA_MODEL` at something else and the cache misses by
+design, so the seed spends about 20 seconds a story writing fresh ones — 112
+stories is 40 minutes. Set `LLM_ENRICH_SEGMENTS=false` in `.env` to skip it and
+take the extractive headlines. Either way the seed prints which it did:
+
+```
+  5wImdQJvZdw     36 stories,  36 frames, 36 cached headlines
+```
+
+#### Analysing a video of your own
+
+`python analyse_video.py <YouTube URL>` needs the network (it fetches captions)
+and, for headlines, a local model:
+
+```powershell
+winget install Ollama.Ollama      # or https://ollama.com/download
+ollama pull qwen2.5:7b            # 4.7 GB, free, runs on CPU
+```
+
+Free, no account, no key, and nothing leaves the machine. Without it the run
+still works — it asks three times, gives up, and uses extractive headlines.
 
 **Terminal 2 — frontend:**
 
@@ -310,13 +334,57 @@ model:
 | Cross-reference the chat and transcript | works *sometimes* — `จันทวิสูตร` and `รัชตะเกียงไกร` do appear correctly elsewhere in the same transcript, but `ศศิภาพร` never does |
 | Switch NER to the PyThaiNLP CRF model | better *spans* (it captures `คุณสาธิตวงษ์หนองเตย` whole instead of truncating) but the characters are still the ASR's |
 
-Knowing which Thai names exist, and which one a phonetic approximation was
-reaching for, is world knowledge. So **`LLM_API_KEY` enables name repair**: one
-call per story returns a corrected entity list and a written headline, and the
-ASR form is stored beside the correction rather than replaced silently, because
-a correction is a claim a reader should be able to check. Without a key the
-pipeline behaves exactly as before, so nothing here is load-bearing for a fresh
-clone or an offline demo.
+#### Two jobs, and only one of them is free
+
+**Headlines need no world knowledge**, only the transcript — so a 7B model
+running locally on CPU does them well, for nothing:
+
+| Extractive | Local LLM (`qwen2.5:7b` via Ollama, free) |
+|---|---|
+| `ซากดิงที่ถูกยิงตายจมกองเลือดใส่ตะกร้าสีชมพู…` | **`เหตุยิงลิงแสมตกลงมาจากบ้านในสงขลา`** |
+| `กรุงเทพนท์ 43เห็นผู้ก่อเหตุขับกระบะเข้าออกซอย…` | **`เหตุสลดหญิงถูกฆ่าหลังถูกตามง้อคืนดี`** |
+| `ต้นกล้าชัยอานันท์ปัญชูนะครับปามนิติรัตน์…` | **`วอลเลย์บอลทีมชาติไทยได้ตั๋วโอลิมปิก เยือนทำเนียบรัฐบาล`** |
+
+This is the default: `LLM_PROVIDER=ollama`, no key, no account, no billing, and
+nothing leaves the machine. About 20 seconds per story on CPU.
+
+**Name repair needs knowing which Thai names exist**, and that a 7B model does
+not. Told explicitly not to guess, `qwen2.5:7b` produced:
+
+| ASR wrote | Model returned | Actually correct |
+|---|---|---|
+| `อนุทินชาวรกูล` | `อนุทินชื่นกล่าว` — invented | `อนุทิน ชาญวีรกูล` |
+| `อัถสิทธิ์เวชชาชีวะ` | `อัชสิทธิ์เวชชาชีวะ` — still wrong | `อภิสิทธิ์ เวชชาชีวะ` |
+| `อำสินสักสิภาพร…` | `อำพันสิทธิ์จันทวิสูตร` — invented | `ออมสิน ศศิภาพร จันทวิสูตร` |
+
+A plausible-looking wrong name is **worse** than a visibly garbled one, because
+a reader cannot tell it happened. So `LLM_CORRECT_NAMES` is off by default and
+the prompt that invites a guess is not even sent unless it is switched on — a
+prompt that asks for a guess gets one. It is worth enabling only on a frontier
+model (`LLM_PROVIDER=anthropic` with `LLM_API_KEY`), and the ASR form is stored
+beside every correction so a reader can check rather than trust it.
+
+With no provider reachable the pipeline behaves exactly as before, so nothing
+here is load-bearing for a fresh clone or an offline demo. A provider that is not
+answering is asked three times and then dropped for the rest of the programme:
+the enrichment timeout is 120 seconds, so without that a 76-story run against a
+stopped Ollama would sit for two and a half hours to produce the extractive
+result it could have produced immediately.
+
+#### The headlines are committed, not re-generated
+
+Twenty seconds a story is 40 minutes across the two stored programmes, and a
+headline written on one machine would otherwise exist only in that machine's
+database. So each written headline is cached in `data/enrichments/<video_id>.json`
+and committed, exactly like the transcript snapshots and the captured frames, and
+for the same reason: **the expensive, non-reproducible part of the pipeline
+ships with the repository, so the demo is identical everywhere and needs no
+model at all.**
+
+The cache key is the hash of the story's own text plus the model that wrote it.
+Both halves matter — if segmentation moves a boundary the story is not the same
+story, so the cache misses rather than stapling an old headline onto new
+content; and switching models never silently serves the previous one's work.
 
 **What was fixable locally was fixed**, and it needed no model. Two classes of
 damage turned out to be the extractor's own, not the ASR's:
@@ -372,6 +440,22 @@ stream looking for one story.
   objective proxy (adjacent segments sharing most keywords = probably one story
   split in two). The signal counts and the boundary reasons are reported so a
   reader can judge; no segmentation F1 is claimed, because none was measured.
+- **A 7B model writes good headlines and needs watching.** 109 of the 112 stored
+  stories got a written headline; 3 fell back to the extractive one. Median
+  length 48 characters. Four failure modes showed up in the first run and each
+  needed a rule, because instructing the model reduced them but did not stop
+  them: it labelled its own answer (`พาดหัว: …`, 2 of the first 36), restated the
+  question instead of answering it (`ข้อความนี้พูดถึงเรื่อง…`), drifted into
+  Chinese (one story came back entirely as `政坛对峙：反击与回应`, and a short prompt
+  produced Thai that switched script mid-sentence), and explained its own
+  headline in a second paragraph. All four are now stripped or rejected — and
+  rejection falls back to the extractive headline, which is why 3 stories have
+  one. After the rules, all 109 pass an audit for self-labels, wrong script,
+  keyword dumps and empties.
+- **The programme's own ident becomes a story.** The longest headlines are
+  faithful summaries of the presenters introducing themselves — 120 characters of
+  names and airtimes. The model is not wrong; the segment really is a station
+  ident, and nothing here distinguishes one from a news item.
 - **Keywords needed a broadcast-specific filler list.** `ผู้ชม` ("dear viewers")
   appeared in 48% of stories. The list was built by measuring document frequency
   across segments, not guessed, and is applied to keyword extraction only — the
@@ -982,7 +1066,7 @@ Interactive docs: <http://127.0.0.1:8000/docs>
 | GET | `/api/broadcast/programmes` | Videos that have a transcript |
 | GET | `/api/broadcast/programmes/{video_id}` | One programme's full story timeline |
 | GET | `/api/broadcast/segments` | Detected stories, filterable by video or topic |
-| POST | `/api/broadcast/analyse` | Transcribe a video and split it into stories |
+| POST | `/api/broadcast/analyse` | Transcribe a video and split it into stories (reuses cached headlines; pass `write_headlines` to let the model write new ones, which takes ~20s per story) |
 | GET | `/media/frames/{video_id}/{sec}.jpg` | Frame captured at a story's start |
 | POST | `/api/ingest/youtube` | Collect + analyse a stream's chat |
 | GET | `/api/ingest/snapshots` | Offline snapshots available |

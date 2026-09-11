@@ -198,9 +198,17 @@ def main(argv: list[str] | None = None) -> int:
                 try:
                     with SessionLocal() as db:
                         result = analyse_video(db, video_id, with_frames=True)
+                    written = result.headlines_written
+                    note = ""
+                    if result.headlines_cached:
+                        note = f", {result.headlines_cached} cached headlines"
+                    if written:
+                        # A model writes one in ~20 seconds, so say so rather
+                        # than letting the seed look hung.
+                        note += f", {written} headlines written by the LLM"
                     print(
                         f"  {video_id:14} {result.segment_count:>3} stories, "
-                        f"{result.frames_captured:>3} frames"
+                        f"{result.frames_captured:>3} frames{note}"
                     )
                 except Exception as exc:  # noqa: BLE001 - one bad file must not stop the seed
                     print(f"  {video_id:14} skipped: {type(exc).__name__}: {exc}")

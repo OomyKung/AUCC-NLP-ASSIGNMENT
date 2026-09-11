@@ -87,6 +87,15 @@ class AnalyseVideoRequest(BaseModel):
     with_frames: bool = Field(
         default=True, description="Capture a still frame at each story start"
     )
+    write_headlines: bool = Field(
+        default=False,
+        description=(
+            "Let the LLM write a headline for any story that has none cached. "
+            "Off by default because it takes about 20 seconds per story, which "
+            "is longer than an HTTP client will wait on a long programme; run "
+            "analyse_video.py for that. Cached headlines are used either way."
+        ),
+    )
 
 
 class AnalyseVideoResponse(BaseModel):
@@ -99,3 +108,5 @@ class AnalyseVideoResponse(BaseModel):
     segment_count: int
     frames_captured: int
     frame_note: str = ""
+    headlines_cached: int = 0
+    headlines_written: int = 0

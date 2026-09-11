@@ -288,7 +288,10 @@ function SegmentCard({ segment }: { segment: NewsSegment }) {
 
           <h4 className="mt-1.5 font-medium text-slate-900 dark:text-white" lang="th">
             {segment.headline}
+            <HeadlineSource segment={segment} />
           </h4>
+
+          <NameCorrections segment={segment} />
 
           {segment.summary && (
             <p
@@ -351,6 +354,50 @@ function SegmentCard({ segment }: { segment: NewsSegment }) {
         </div>
       </div>
     </article>
+  )
+}
+
+/**
+ * Marks a headline a language model wrote.
+ *
+ * The extractive headline is a span lifted verbatim out of the transcript, so it
+ * is guaranteed to be something that was said. A written one reads far better
+ * and is a paraphrase, so it is not guaranteed in the same way. That difference
+ * belongs on screen rather than in the README — the same reason a boundary shows
+ * the signals that produced it instead of presenting itself as an oracle.
+ */
+function HeadlineSource({ segment }: { segment: NewsSegment }) {
+  if (segment.enriched_by !== 'llm') return null
+  return (
+    <span
+      className="ml-1.5 align-middle rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"
+      title="พาดหัวนี้เขียนโดยโมเดลภาษา (สรุปความ) ไม่ใช่ข้อความที่ตัดมาจากคำถอดเสียงโดยตรง"
+    >
+      AI เขียนพาดหัว
+    </span>
+  )
+}
+
+/**
+ * Shows names the model respelled, with the form the ASR produced.
+ *
+ * A correction is a claim about what was said, so the reader gets to see what it
+ * replaced. Empty unless LLM_CORRECT_NAMES is on, which it is not by default —
+ * a small local model invents Thai names rather than admitting it cannot tell.
+ */
+function NameCorrections({ segment }: { segment: NewsSegment }) {
+  const pairs = (segment.name_corrections ?? []).filter((pair) => pair.length === 2)
+  if (pairs.length === 0) return null
+  return (
+    <p className="mt-1 text-[11px] text-slate-400" lang="th">
+      แก้การสะกดชื่อ:{' '}
+      {pairs.map(([asr, fixed], index) => (
+        <span key={`${asr}-${fixed}`}>
+          {index > 0 && ', '}
+          <span className="line-through">{asr}</span> → {fixed}
+        </span>
+      ))}
+    </p>
   )
 }
 

@@ -50,8 +50,11 @@ Guess. A name with no lexicon support is left exactly as the ASR wrote it.
 Inventing a plausible Thai name would make the output look better and be
 worse, and there is no way for a reader to tell the two apart.
 
-``ศศิภาพร`` and ``อำสิน`` need knowledge of which Thai names exist, which is what
-``LLM_API_KEY`` and :mod:`app.nlp.llm_enrich` are for.
+``ศศิภาพร`` and ``อำสิน`` need knowledge of which Thai names exist. That is what
+:mod:`app.nlp.llm_enrich` is for -- and measurably *not* what a 7B local model
+has: told not to guess, it still invented ``อำพันสิทธิ์จันทวิสูตร``. So name
+repair there is off unless ``LLM_CORRECT_NAMES`` is switched on against a
+frontier model, and this module's suffix trimming is what runs by default.
 """
 
 from __future__ import annotations

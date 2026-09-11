@@ -39,6 +39,35 @@ from app.services.transcripts import (  # noqa: E402
     TranscriptUnavailable,
     provider_status,
 )
+from app.config import settings  # noqa: E402
+from app.services.segmentation import Segment  # noqa: E402
+
+
+def llm_status() -> str:
+    """One line describing who will write the headlines, and what it costs."""
+    if not settings.llm_enrich_segments:
+        return "off (extractive headlines)"
+    if settings.llm_provider == "ollama":
+        return (
+            f"ollama {settings.ollama_model} at {settings.ollama_base_url}"
+            " (local, free, ~20s per story)"
+        )
+    if settings.has_llm:
+        return f"anthropic {settings.llm_model} (billed per story)"
+    return "unavailable: LLM_PROVIDER=anthropic but LLM_API_KEY is unset"
+
+
+def report_progress(done: int, total: int, segment: Segment) -> None:
+    """Overwrite one line per story.
+
+    A local model spends about 20 seconds per story, so a long programme is a
+    quarter of an hour of apparent silence without this.
+    """
+    headline = segment.headline[:48]
+    sys.stdout.write(f"\r  story {done:>3}/{total}  {segment.timecode:>8}  {headline}")
+    sys.stdout.flush()
+    if done == total:
+        sys.stdout.write("\n")
 
 
 def show_stored() -> int:
@@ -91,11 +120,17 @@ def main(argv: list[str] | None = None) -> int:
     status = provider_status()
     print(f"transcript backend : {status['active']}", end="")
     print(f"  ({status['note']})" if status.get("note") else "")
+    print(f"headline writer    : {llm_status()}")
 
     began = time.perf_counter()
     try:
         with SessionLocal() as db:
-            result = analyse_video(db, args.source, with_frames=not args.no_frames)
+            result = analyse_video(
+                db,
+                args.source,
+                with_frames=not args.no_frames,
+                progress=report_progress,
+            )
     except TranscriptUnavailable as exc:
         print(f"\nNo transcript available: {exc}", file=sys.stderr)
         return 1
@@ -108,6 +143,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  transcript : {result.source}")
     print(f"  length     : {result.duration_ms / 60000:.0f} min, {result.cue_count:,} cues")
     print(f"  stories    : {result.segment_count}")
+    if result.headlines_cached or result.headlines_written:
+        print(
+            f"  headlines  : {result.headlines_written} written by the model, "
+            f"{result.headlines_cached} reused from data/enrichments"
+        )
     print(f"  frames     : {result.frames_captured}")
     if result.frame_note:
         print(f"  frame note : {result.frame_note}")

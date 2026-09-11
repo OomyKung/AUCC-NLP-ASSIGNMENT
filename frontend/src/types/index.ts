@@ -338,6 +338,14 @@ export interface NewsSegment {
   youtube_url: string
   /** Frame captured from the video at that moment. */
   frame_url: string | null
+  /**
+   * Who wrote the headline: '' for the extractive default (a phrase lifted
+   * verbatim from the transcript), 'llm' when a language model wrote it.
+   * Surfaced in the UI because the two carry different guarantees.
+   */
+  enriched_by: string
+  /** Name spellings the model changed, as [asr_form, corrected] pairs. */
+  name_corrections: string[][]
 }
 
 export interface BroadcastTranscript {

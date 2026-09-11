@@ -40,8 +40,10 @@ Honest limits
 Quality is bounded by the transcript. ASR mangles names (``ชาญวีรกูล`` becomes
 ``ชาวรกูล``), and a presenter who rambles gives nothing dense to extract. Roughly
 two thirds of stories get a genuinely descriptive headline; the rest get
-something on-topic but clumsy. Setting ``LLM_API_KEY`` switches on a generated
-headline instead, which is much better and is why the seam exists.
+something on-topic but clumsy. A language model writes a much better one -- and
+needs no world knowledge to do it, only the transcript -- which is why the seam
+exists; see :mod:`app.nlp.llm_enrich`. That is on by default through a local
+model, so this extractive path is the fallback rather than the norm.
 """
 
 from __future__ import annotations

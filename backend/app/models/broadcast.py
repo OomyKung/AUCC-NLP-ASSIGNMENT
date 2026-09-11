@@ -123,9 +123,10 @@ class NewsSegment(Base):
     boundary_confidence: Mapped[float] = mapped_column(Float, default=0.0)
 
     # Name spellings the LLM corrected, as [[asr_form, corrected], ...].
-    # Empty without LLM_API_KEY. Stored rather than applied silently: a
-    # correction is a claim about what was said, and a reader should be able to
-    # see the ASR form it replaced.
+    # Empty unless LLM_CORRECT_NAMES is on, which it is not by default: a small
+    # local model invents Thai names rather than admitting it cannot tell.
+    # Stored rather than applied silently -- a correction is a claim about what
+    # was said, and a reader should be able to see the ASR form it replaced.
     name_corrections: Mapped[list] = mapped_column(JSON, default=list)
     # Which component produced the headline and entities: "" for the
     # extractive default, "llm" when the model was used.

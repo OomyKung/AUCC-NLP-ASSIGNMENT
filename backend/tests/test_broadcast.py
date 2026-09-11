@@ -588,13 +588,28 @@ def test_topic_disagreement_alone_does_not_split_a_coherent_story():
 # --------------------------------------------------------------------------
 
 
-def test_llm_is_inert_without_a_key():
-    """Nothing here may be load-bearing: a fresh clone has no LLM_API_KEY and
-    must still produce a full timeline."""
-    from app.nlp.llm_enrich import LLMUnavailable, enrich_segment
+def test_no_provider_available_degrades_rather_than_breaking(monkeypatch):
+    """Nothing here may be load-bearing. A fresh clone may have no API key and
+    no Ollama running, and must still produce a full timeline.
 
-    with pytest.raises(LLMUnavailable, match="LLM_API_KEY"):
-        enrich_segment("ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก")
+    (This used to assert the absence of LLM_API_KEY alone made enrichment
+    impossible. Ollama needs no key, so the condition is now "no provider
+    reachable", not "no key".)
+    """
+    from app.config import settings
+    from app.nlp import llm_enrich
+
+    monkeypatch.setattr(settings, "llm_provider", "ollama")
+
+    def unreachable(prompt, *, timeout):
+        raise ConnectionError("connection refused")
+
+    monkeypatch.setattr(llm_enrich, "_call_ollama", unreachable)
+
+    with pytest.raises(llm_enrich.LLMUnavailable):
+        llm_enrich.enrich_segment(
+            "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
+        )
 
 
 def test_parses_a_fenced_json_completion():
@@ -788,3 +803,554 @@ def test_an_asr_misspelling_is_left_alone_rather_than_guessed():
     lexicon = _lexicon(**{"ศศิ": 9, "ภาพร": 5})
 
     assert correct_name("สักสิภาพร", lexicon) == "สักสิภาพร"
+
+
+# --------------------------------------------------------------------------
+# LLM provider routing
+# --------------------------------------------------------------------------
+
+
+def test_name_repair_is_off_by_default():
+    """A 7B model told not to guess produced อนุทินชื่นกล่าว for
+    อนุทินชาวรกูล and อำพันสิทธิ์จันทวิสูตร for อำสินสักสิภาพร. A
+    plausible-looking wrong name is worse than a garbled one."""
+    from app.config import settings
+
+    assert settings.llm_correct_names is False
+
+
+def test_headline_only_mode_never_sends_the_correction_prompt(monkeypatch):
+    """The guard is on the *request*, not on the response. A prompt that invites
+    a guess gets one, so it must not be sent at all."""
+    from app.config import settings
+    from app.nlp import llm_enrich
+
+    monkeypatch.setattr(settings, "llm_correct_names", False)
+    sent: list[str] = []
+
+    def fake(prompt, *, timeout):
+        sent.append(prompt)
+        return "จับกุมผู้ต้องหาคดียาเสพติด"
+
+    monkeypatch.setattr(llm_enrich, "_complete", fake)
+    result = llm_enrich.enrich_segment("ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลาง")
+
+    assert result.headline == "จับกุมผู้ต้องหาคดียาเสพติด"
+    assert result.entities == []
+    assert len(sent) == 1
+    # The word the correction prompt uses for "correct the spelling".
+    assert "แก้การสะกด" not in sent[0]
+
+
+def test_correction_prompt_is_used_when_explicitly_enabled(monkeypatch):
+    from app.config import settings
+    from app.nlp import llm_enrich
+
+    monkeypatch.setattr(settings, "llm_correct_names", True)
+    sent: list[str] = []
+
+    def fake(prompt, *, timeout):
+        sent.append(prompt)
+        return '{"headline": "ข่าว", "entities": []}'
+
+    monkeypatch.setattr(llm_enrich, "_complete", fake)
+    llm_enrich.enrich_segment("ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลาง")
+
+    assert "แก้การสะกด" in sent[0]
+
+
+def test_ollama_needs_no_api_key(monkeypatch):
+    """The whole point of the local provider: free, and no account."""
+    from app.config import settings
+    from app.nlp import llm_enrich
+
+    monkeypatch.setattr(settings, "llm_provider", "ollama")
+    monkeypatch.setattr(settings, "llm_api_key", None)
+    monkeypatch.setattr(
+        llm_enrich, "_call_ollama", lambda prompt, *, timeout: "พาดหัวข่าว"
+    )
+
+    assert llm_enrich._complete("x", timeout=5) == "พาดหัวข่าว"
+
+
+def test_anthropic_without_a_key_is_reported_not_attempted(monkeypatch):
+    from app.config import settings
+    from app.nlp import llm_enrich
+
+    monkeypatch.setattr(settings, "llm_provider", "anthropic")
+    monkeypatch.setattr(settings, "llm_api_key", None)
+
+    with pytest.raises(llm_enrich.LLMUnavailable, match="LLM_API_KEY"):
+        llm_enrich._complete("x", timeout=5)
+
+
+def test_a_failing_model_leaves_the_extractive_headline_alone(monkeypatch):
+    """A worse headline is a far better outcome than a missing story."""
+    from app.nlp import llm_enrich
+    from app.services.segmentation import _enrich_with_llm
+
+    segment = Segment(index=0, start_ms=0, end_ms=60_000, text="ตำรวจจับกุมผู้ต้องหา")
+    segment.headline = "extractive headline"
+
+    def boom(prompt, *, timeout):
+        raise llm_enrich.LLMUnavailable("ollama is not running")
+
+    monkeypatch.setattr(llm_enrich, "_complete", boom)
+    assert _enrich_with_llm(segment) == "unavailable"
+
+    assert segment.headline == "extractive headline"
+    assert segment.enriched_by == ""
+    # Reported as unavailable, so the caller can stop asking a dead provider.
+    assert _enrich_with_llm(segment) == "unavailable"
+
+
+def test_a_dead_provider_stops_being_asked(monkeypatch):
+    """The circuit breaker, and the reason it exists.
+
+    The enrichment timeout is 120 seconds. Without this, a 76-story programme
+    run against an Ollama that is not running would sit for two and a half hours
+    to produce exactly the extractive result it could have produced at once.
+    """
+    from app.config import settings
+    from app.services import segmentation
+
+    monkeypatch.setattr(settings, "llm_enrich_segments", True)
+    monkeypatch.setattr(settings, "llm_provider", "ollama")
+
+    attempts: list[int] = []
+
+    def always_fails(segment, *, cache=None, allow_model=True):
+        attempts.append(segment.index)
+        return "unavailable"
+
+    monkeypatch.setattr(segmentation, "_enrich_with_llm", always_fails)
+
+    segments = [
+        Segment(
+            index=index,
+            start_ms=index * 60_000,
+            end_ms=(index + 1) * 60_000,
+            text="ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก",
+        )
+        for index in range(10)
+    ]
+    segmentation.analyse_segments(segments)
+
+    assert len(attempts) == segmentation.LLM_FAILURE_LIMIT
+    # Every story still got its extractive analysis.
+    assert all(segment.headline for segment in segments)
+
+
+def test_a_recovering_provider_keeps_being_asked(monkeypatch):
+    """One timeout must not disable the model for the rest of the programme --
+    the breaker counts *consecutive* failures, not total ones."""
+    from app.config import settings
+    from app.services import segmentation
+
+    monkeypatch.setattr(settings, "llm_enrich_segments", True)
+    monkeypatch.setattr(settings, "llm_provider", "ollama")
+
+    attempts: list[int] = []
+
+    def flaky(segment, *, cache=None, allow_model=True):
+        attempts.append(segment.index)
+        # Fails on every third story, so failures never run consecutively.
+        worked = segment.index % 3 != 0
+        if worked:
+            segment.enriched_by = "llm"
+        return "model" if worked else "unavailable"
+
+    monkeypatch.setattr(segmentation, "_enrich_with_llm", flaky)
+
+    segments = [
+        Segment(
+            index=index,
+            start_ms=index * 60_000,
+            end_ms=(index + 1) * 60_000,
+            text="ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก",
+        )
+        for index in range(9)
+    ]
+    segmentation.analyse_segments(segments)
+
+    assert len(attempts) == 9
+
+
+def test_progress_is_reported_per_story(monkeypatch):
+    """A local model spends ~20s per story, so a caller must be able to say so
+    rather than print nothing for a quarter of an hour."""
+    from app.config import settings
+    from app.services import segmentation
+
+    monkeypatch.setattr(settings, "llm_enrich_segments", False)
+
+    seen: list[tuple[int, int]] = []
+    segments = [
+        Segment(
+            index=index,
+            start_ms=index * 60_000,
+            end_ms=(index + 1) * 60_000,
+            text="ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก",
+        )
+        for index in range(3)
+    ]
+    segmentation.analyse_segments(
+        segments, progress=lambda done, total, segment: seen.append((done, total))
+    )
+
+    assert seen == [(1, 3), (2, 3), (3, 3)]
+
+
+# --------------------------------------------------------------------------
+# Enrichment cache: the 40 minutes of model time is paid once, then committed
+# --------------------------------------------------------------------------
+
+
+NEWLINE = chr(10)
+
+
+def _segment(text: str, index: int = 0) -> Segment:
+    return Segment(
+        index=index,
+        start_ms=index * 60_000,
+        end_ms=(index + 1) * 60_000,
+        text=text,
+    )
+
+
+def test_a_cached_headline_is_reused_without_calling_the_model(monkeypatch):
+    """The reason the cache exists: 20 seconds a story, 112 stories."""
+    from app.nlp import llm_enrich
+    from app.services.enrichment_cache import EnrichmentCache
+    from app.services.segmentation import _enrich_with_llm
+
+    text = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดยาบ้าหนึ่งล้านเม็ด"
+    cache = EnrichmentCache("video")
+    cache.put(text, headline="จับกุมคดียาเสพติดรายใหญ่", entities=[], corrections=[])
+
+    def must_not_be_called(prompt, *, timeout):
+        raise AssertionError("the model was called despite a cache hit")
+
+    monkeypatch.setattr(llm_enrich, "_complete", must_not_be_called)
+
+    segment = _segment(text)
+    segment.headline = "extractive"
+    assert _enrich_with_llm(segment, cache=cache) == "cache"
+    assert segment.headline == "จับกุมคดียาเสพติดรายใหญ่"
+    assert segment.enriched_by == "llm"
+
+
+def test_a_changed_segment_misses_rather_than_reusing_the_old_headline(monkeypatch):
+    """If segmentation moves a boundary the story is not the same story, so the
+    previous headline must not be stapled onto new content."""
+    from app.services.enrichment_cache import EnrichmentCache
+
+    cache = EnrichmentCache("video")
+    cache.put("ข่าวแรกเรื่องอุบัติเหตุบนถนน", headline="อุบัติเหตุ", entities=[], corrections=[])
+
+    assert cache.get("ข่าวแรกเรื่องอุบัติเหตุบนถนน") is not None
+    assert cache.get("ข่าวแรกเรื่องอุบัติเหตุบนถนนและข่าวที่สอง") is None
+
+
+def test_whitespace_alone_does_not_cause_a_miss():
+    """The ASR's spacing is not meaningful; anything else is."""
+    from app.services.enrichment_cache import EnrichmentCache
+
+    cache = EnrichmentCache("video")
+    cache.put("ข่าว  เรื่อง\nอุบัติเหตุ", headline="อุบัติเหตุ", entities=[], corrections=[])
+    assert cache.get("ข่าว เรื่อง อุบัติเหตุ") is not None
+
+
+def test_switching_models_does_not_serve_the_previous_one(monkeypatch):
+    from app.config import settings
+    from app.services.enrichment_cache import EnrichmentCache
+
+    monkeypatch.setattr(settings, "llm_provider", "ollama")
+    monkeypatch.setattr(settings, "ollama_model", "qwen2.5:7b")
+    cache = EnrichmentCache("video")
+    cache.put("ข่าวเรื่องอุบัติเหตุบนถนนสายหลัก", headline="เขียนโดย qwen", entities=[], corrections=[])
+
+    monkeypatch.setattr(settings, "ollama_model", "llama3.1:8b")
+    assert cache.get("ข่าวเรื่องอุบัติเหตุบนถนนสายหลัก") is None
+
+
+def test_no_cache_means_no_file_is_written(tmp_path, monkeypatch):
+    """Passing no cache disables it outright, which is what keeps a test run
+    from writing into committed data."""
+    from app.config import settings
+    from app.nlp import llm_enrich
+    from app.services.segmentation import _enrich_with_llm
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    monkeypatch.setattr(
+        llm_enrich, "_complete", lambda prompt, *, timeout: "พาดหัวจากโมเดล"
+    )
+
+    segment = _segment("ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก")
+    assert _enrich_with_llm(segment) == "model"
+    assert segment.headline == "พาดหัวจากโมเดล"
+    assert not (tmp_path / "enrichments").exists()
+
+
+def test_the_cache_round_trips_through_disk(tmp_path, monkeypatch):
+    from app.config import settings
+    from app.services import enrichment_cache
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    text = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
+
+    cache = enrichment_cache.load("abc123")
+    assert cache.get(text) is None
+    cache.put(text, headline="จับกุมคดียาเสพติด", entities=[{"text": "ตำรวจ", "label": "ORGANIZATION"}], corrections=[("อำสิน", "ออมสิน")])
+    enrichment_cache.save(cache)
+
+    reloaded = enrichment_cache.load("abc123")
+    entry = reloaded.get(text)
+    assert entry is not None
+    assert entry["headline"] == "จับกุมคดียาเสพติด"
+    assert entry["corrections"] == [["อำสิน", "ออมสิน"]]
+    # Thai is stored readable, so the committed file can be reviewed in a diff.
+    assert "จับกุมคดียาเสพติด" in enrichment_cache.cache_path("abc123").read_text(encoding="utf-8")
+
+
+def test_an_unsaved_cache_leaves_no_file(tmp_path, monkeypatch):
+    """A read-only pass must not rewrite committed data."""
+    from app.config import settings
+    from app.services import enrichment_cache
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    cache = enrichment_cache.load("abc123")
+    cache.get("ข่าวที่ไม่เคยถูกเขียนพาดหัว")
+    enrichment_cache.save(cache)
+    assert not enrichment_cache.cache_path("abc123").exists()
+
+
+def test_a_corrupt_cache_file_is_ignored_not_fatal(tmp_path, monkeypatch):
+    from app.config import settings
+    from app.services import enrichment_cache
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    path = enrichment_cache.cache_path("abc123")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{not json", encoding="utf-8")
+
+    cache = enrichment_cache.load("abc123")
+    assert cache.entries == {}
+
+
+def test_autosave_keeps_the_work_of_an_interrupted_run(tmp_path, monkeypatch):
+    """A 76-story programme is 25 minutes of model time. Saving only at the end
+    means a Ctrl+C at minute 24 throws all of it away."""
+    from app.config import settings
+    from app.services import enrichment_cache
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    cache = enrichment_cache.load("abc123", autosave=True)
+    cache.put("ข่าวแรกเรื่องอุบัติเหตุบนถนน", headline="อุบัติเหตุบนถนน", entities=[], corrections=[])
+
+    # On disk already, with no save() call of our own.
+    reloaded = enrichment_cache.load("abc123")
+    assert reloaded.get("ข่าวแรกเรื่องอุบัติเหตุบนถนน") is not None
+    # And nothing left to write, so the final save is a no-op rather than a
+    # redundant rewrite of the committed file.
+    assert cache.dirty is False
+
+
+def test_a_model_labelling_its_own_headline_is_stripped():
+    """The prompt says ไม่ต้องขึ้นต้นว่า "พาดหัว" and 2 of the first 36 came back
+    with exactly that. Instructions reduce this; they do not remove it."""
+    from app.nlp.llm_enrich import _clean_headline
+
+    assert _clean_headline("พาดหัว: โค้ชวอลเลย์บอลคว้าแชมป์") == "โค้ชวอลเลย์บอลคว้าแชมป์"
+    assert (
+        _clean_headline('พาดหัวข่าว : "เหตุยิงลิงแสมในสงขลา"') == "เหตุยิงลิงแสมในสงขลา"
+    )
+    # A bare word is not a label: a headline may genuinely open with สรุป.
+    assert _clean_headline("สรุปสถานการณ์น้ำท่วมภาคเหนือ") == "สรุปสถานการณ์น้ำท่วมภาคเหนือ"
+    # Nothing but a label is a failure, reported as one.
+    assert _clean_headline("พาดหัว:") == ""
+
+
+def test_a_label_only_completion_falls_back_to_the_extractive_headline(monkeypatch):
+    from app.nlp import llm_enrich
+    from app.services.segmentation import _enrich_with_llm
+
+    monkeypatch.setattr(llm_enrich, "_complete", lambda prompt, *, timeout: "พาดหัว:")
+    segment = _segment("ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก")
+    segment.headline = "extractive headline"
+
+    assert _enrich_with_llm(segment) == "unavailable"
+    assert segment.headline == "extractive headline"
+
+
+def test_tightening_the_cleaner_reaches_already_cached_headlines(monkeypatch):
+    """Cached work should improve with the rule, not stay frozen at the version
+    that was current when it was written."""
+    from app.nlp import llm_enrich
+    from app.services.enrichment_cache import EnrichmentCache
+    from app.services.segmentation import _enrich_with_llm
+
+    text = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
+    cache = EnrichmentCache("video")
+    # Written before the label rule existed.
+    cache.put(text, headline="พาดหัว: จับกุมคดียาเสพติด", entities=[], corrections=[])
+
+    monkeypatch.setattr(
+        llm_enrich,
+        "_complete",
+        lambda prompt, *, timeout: (_ for _ in ()).throw(
+            AssertionError("model called on a cache hit")
+        ),
+    )
+    segment = _segment(text)
+    assert _enrich_with_llm(segment, cache=cache) == "cache"
+    assert segment.headline == "จับกุมคดียาเสพติด"
+
+
+def test_disallowing_the_model_still_reads_the_cache(monkeypatch):
+    """What keeps POST /broadcast/analyse a request rather than a 25-minute wait:
+    a shipped programme still gets its written headlines, a new one does not stall
+    the client waiting for 76 of them."""
+    from app.nlp import llm_enrich
+    from app.services.enrichment_cache import EnrichmentCache
+    from app.services.segmentation import _enrich_with_llm
+
+    cached_text = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
+    fresh_text = "ฝนตกหนักต่อเนื่องทำให้เกิดน้ำท่วมในหลายจังหวัดภาคเหนือ"
+    cache = EnrichmentCache("video")
+    cache.put(cached_text, headline="จับกุมคดียาเสพติด", entities=[], corrections=[])
+
+    def must_not_be_called(prompt, *, timeout):
+        raise AssertionError("the model was called with allow_model=False")
+
+    monkeypatch.setattr(llm_enrich, "_complete", must_not_be_called)
+
+    hit = _segment(cached_text)
+    assert _enrich_with_llm(hit, cache=cache, allow_model=False) == "cache"
+    assert hit.headline == "จับกุมคดียาเสพติด"
+
+    miss = _segment(fresh_text, index=1)
+    miss.headline = "extractive headline"
+    assert _enrich_with_llm(miss, cache=cache, allow_model=False) == "skipped"
+    assert miss.headline == "extractive headline"
+
+
+def test_a_skip_does_not_trip_the_circuit_breaker(monkeypatch):
+    """A skip is a decision, not a failure: it must not stop the remaining
+    stories from reading their cached headlines."""
+    from app.config import settings
+    from app.nlp import llm_enrich
+    from app.services import segmentation
+    from app.services.enrichment_cache import EnrichmentCache
+
+    monkeypatch.setattr(settings, "llm_enrich_segments", True)
+    monkeypatch.setattr(settings, "llm_provider", "ollama")
+    monkeypatch.setattr(
+        llm_enrich,
+        "_complete",
+        lambda prompt, *, timeout: (_ for _ in ()).throw(
+            AssertionError("model called with allow_model=False")
+        ),
+    )
+
+    texts = [
+        f"ข่าวเรื่องที่ {index} ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลาง"
+        for index in range(8)
+    ]
+    cache = EnrichmentCache("video")
+    # Only the last story has a cached headline; the seven before it are skips.
+    cache.put(texts[-1], headline="พาดหัวจากแคช", entities=[], corrections=[])
+
+    segments = [_segment(text, index=index) for index, text in enumerate(texts)]
+    segmentation.analyse_segments(segments, cache=cache, allow_model=False)
+
+    assert segments[-1].headline == "พาดหัวจากแคช"
+    assert segments[-1].enriched_by == "llm"
+    assert all(segment.enriched_by == "" for segment in segments[:-1])
+
+
+def test_a_restated_question_is_trimmed_to_the_headline():
+    """The prompt asks สรุปว่าข้อความนี้พูดถึงเรื่องอะไร, and the model answers
+    literally: "ข้อความนี้พูดถึงเรื่อง..." -- a sentence about the text instead of
+    a headline for it. The part after the preamble is the headline."""
+    from app.nlp.llm_enrich import _clean_headline
+
+    assert (
+        _clean_headline("ข้อความนี้พูดถึงเรื่องการลุยธุรกิจโรงแรม")
+        == "การลุยธุรกิจโรงแรม"
+    )
+    assert _clean_headline("ข่าวนี้เกี่ยวกับเหตุยิงลิงแสมในสงขลา") == "เหตุยิงลิงแสมในสงขลา"
+    # Label and preamble together, as they sometimes arrive.
+    assert _clean_headline("พาดหัว: ข้อความนี้กล่าวถึงน้ำท่วมภาคเหนือ") == "น้ำท่วมภาคเหนือ"
+    # A bare noun phrase that merely starts with ข่าว is not a preamble.
+    assert _clean_headline("ข่าวเช้าช่อง8") == "ข่าวเช้าช่อง8"
+
+
+def test_an_unusable_cached_headline_is_asked_again(monkeypatch):
+    """A cached entry that cleans down to nothing is not a result. Marking the
+    story as LLM-enriched with an empty headline would claim work that is not
+    there."""
+    from app.nlp import llm_enrich
+    from app.services.enrichment_cache import EnrichmentCache
+    from app.services.segmentation import _enrich_with_llm
+
+    text = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
+    cache = EnrichmentCache("video")
+    cache.put(text, headline="พาดหัว:", entities=[], corrections=[])
+
+    monkeypatch.setattr(
+        llm_enrich, "_complete", lambda prompt, *, timeout: "จับกุมคดียาเสพติดรายใหญ่"
+    )
+    segment = _segment(text)
+    assert _enrich_with_llm(segment, cache=cache) == "model"
+    assert segment.headline == "จับกุมคดียาเสพติดรายใหญ่"
+
+    # And with no model to ask, the extractive headline stands rather than an
+    # empty one.
+    other = _segment(text, index=1)
+    other.headline = "extractive headline"
+    cache_only = EnrichmentCache("video")
+    cache_only.put(text, headline="พาดหัว:", entities=[], corrections=[])
+    assert _enrich_with_llm(other, cache=cache_only, allow_model=False) == "skipped"
+    assert other.headline == "extractive headline"
+    assert other.enriched_by == ""
+
+
+def test_written_headlines_are_counted_not_inferred():
+    """The count is what the model was asked for. Subtracting cache hits from the
+    enriched total could not tell a stale entry from a fresh call."""
+    from app.services.enrichment_cache import EnrichmentCache
+
+    cache = EnrichmentCache("video")
+    assert cache.writes == 0
+    cache.put("ข่าวเรื่องอุบัติเหตุบนถนนสายหลัก", headline="อุบัติเหตุ", entities=[], corrections=[])
+    cache.put("ข่าวเรื่องน้ำท่วมภาคเหนือหลายจังหวัด", headline="น้ำท่วม", entities=[], corrections=[])
+    assert cache.writes == 2
+    assert cache.hits == 0
+
+
+def test_a_headline_in_the_wrong_language_is_rejected():
+    """Asked for a Thai headline, qwen2.5:7b answered story 57 of the second
+    programme in Chinese. A headline in the wrong language is worse than a clumsy
+    Thai one, because the timeline stops being readable."""
+    from app.nlp.llm_enrich import _clean_headline
+
+    assert _clean_headline("政坛对峙：反击与回应") == ""
+    assert _clean_headline("Political standoff in parliament") == ""
+    # And the mixed case, which is the one that actually reaches the screen: the
+    # model starts in Thai and switches mid-sentence. Half a headline in the
+    # wrong script is worse than none -- the extractive fallback was readable.
+    assert _clean_headline("พาดหัวข่าว: ตำรวจยึด成果如下：新闻标题") == ""
+    # Latin inside a Thai headline is ordinary and stays.
+    assert _clean_headline("จัดระเบียบ Data Center ตามมติครม.") == "จัดระเบียบ Data Center ตามมติครม."
+
+
+def test_only_the_first_line_of_a_completion_is_the_headline():
+    """A model that explains its own answer would otherwise have the explanation
+    folded in by the whitespace collapse."""
+    from app.nlp.llm_enrich import _clean_headline
+
+    completion = "ตำรวจจับผู้ต้องหาคดียาเสพติด" + NEWLINE * 2 + "นี่คือพาดหัวที่กระชับและตรงประเด็น"
+    assert _clean_headline(completion) == "ตำรวจจับผู้ต้องหาคดียาเสพติด"
+    # Leading blank lines are skipped rather than read as an empty headline.
+    assert _clean_headline(NEWLINE + "  " + NEWLINE + "น้ำท่วมภาคเหนือ") == "น้ำท่วมภาคเหนือ"

@@ -177,9 +177,20 @@ def analyse(
     Slow by nature -- a four-hour programme takes roughly a minute -- because it
     fetches the transcript, classifies every 30-second block, segments, and
     captures a frame per story.
+
+    Headlines already written for this video are reused from the committed cache,
+    but new ones are *not* written unless ``write_headlines`` asks: a model spends
+    about 20 seconds a story, so a 76-story programme would hold the request open
+    for 25 minutes. ``analyse_video.py`` is the place for that, and it reports
+    progress while it works.
     """
     try:
-        result = analyse_video(db, payload.url, with_frames=payload.with_frames)
+        result = analyse_video(
+            db,
+            payload.url,
+            with_frames=payload.with_frames,
+            allow_model=payload.write_headlines,
+        )
     except TranscriptUnavailable as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except CollectorError as exc:

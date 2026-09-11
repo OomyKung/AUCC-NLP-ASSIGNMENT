@@ -17,6 +17,7 @@ recorded and skipped rather than aborting an ingest that otherwise succeeded.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.broadcast import NewsSegment, VideoTranscript
 from app.models.chat import ChatStream
+from app.services import enrichment_cache
 from app.services.collectors.base import extract_video_id, watch_url
 from app.services.frames import FrameUnavailable, capture_frames
 from app.services.segmentation import Segment, segment_transcript
@@ -47,6 +49,11 @@ class BroadcastResult:
     segment_count: int
     frames_captured: int
     frame_note: str = ""
+    # Where the headlines came from. Reported rather than inferred, because
+    # "cached" and "just written by a model" cost 0 and 20 seconds a story and a
+    # caller watching a long run deserves to know which it is getting.
+    headlines_cached: int = 0
+    headlines_written: int = 0
 
     def as_dict(self) -> dict:
         return {
@@ -57,6 +64,8 @@ class BroadcastResult:
             "segment_count": self.segment_count,
             "frames_captured": self.frames_captured,
             "frame_note": self.frame_note,
+            "headlines_cached": self.headlines_cached,
+            "headlines_written": self.headlines_written,
         }
 
 
@@ -202,6 +211,8 @@ def analyse_video(
     with_frames: bool = True,
     title: str | None = None,
     refresh: bool = False,
+    progress: Callable[[int, int, Segment], None] | None = None,
+    allow_model: bool = True,
 ) -> BroadcastResult:
     """Fetch, segment, capture and store one video's spoken content.
 
@@ -211,6 +222,12 @@ def analyse_video(
 
     Args:
         refresh: Ignore any cached transcript snapshot and re-fetch.
+        progress: Called after each story is analysed, as
+            ``(done, total, segment)``. With LLM headlines enabled a long
+            programme takes minutes, so a CLI caller needs to report movement.
+        allow_model: Whether a headline may be *written*. Cached headlines are
+            used either way. False keeps an HTTP request short -- writing 76 of
+            them takes 25 minutes.
     """
     video_id = extract_video_id(source)
 
@@ -221,7 +238,15 @@ def analyse_video(
         transcript = get_transcript_provider().fetch(video_id)
         save_transcript_snapshot(transcript)
 
-    segments, _boundaries, _blocks = segment_transcript(transcript)
+    # Headlines already written for this video are reused rather than paid for
+    # again: 20 seconds a story adds up to 40 minutes over the stored
+    # programmes, and the result is committed so every clone gets the same
+    # timeline without running a model at all.
+    # autosave, so a 25-minute run interrupted at minute 24 keeps what it wrote.
+    cache = enrichment_cache.load(video_id, autosave=True)
+    segments, _boundaries, _blocks = segment_transcript(
+        transcript, progress=progress, cache=cache, allow_model=allow_model
+    )
 
     frames: dict[int, Path] = {}
     note = ""
@@ -247,6 +272,8 @@ def analyse_video(
         segment_count=len(segments),
         frames_captured=len(frames),
         frame_note=note,
+        headlines_cached=cache.hits,
+        headlines_written=cache.writes,
     )
 
 

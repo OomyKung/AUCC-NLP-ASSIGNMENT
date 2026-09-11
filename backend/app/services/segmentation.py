@@ -47,9 +47,11 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from app.config import settings
+from app.services.enrichment_cache import EnrichmentCache
 from app.services.transcripts.base import Transcript, TranscriptCue
 
 # ---------------------------------------------------------------- parameters
@@ -65,6 +67,13 @@ COMPARISON_BLOCKS = 3
 
 # A block with less text than this is mostly silence or music; it gets no vote.
 MIN_BLOCK_CHARS = 40
+
+# Consecutive LLM failures tolerated before the rest of the programme gives up
+# on it. This matters more than it looks: the enrichment timeout is 120 seconds,
+# so a programme of 60 stories against a provider that is simply not running
+# would sit there for two hours producing the extractive result it could have
+# produced immediately.
+LLM_FAILURE_LIMIT = 3
 
 # Consecutive blocks that must agree on a new topic before the label signal
 # fires. 1 would make it fire on classifier noise.
@@ -82,6 +91,14 @@ MUSIC_GAP_MS = 4_000
 DEPTH_STD_MULTIPLIER = 0.5
 
 _THAI = re.compile(r"[฀-๿]")
+
+
+# Consecutive LLM failures tolerated before the rest of the programme gives up
+# on it. This matters more than it looks: the enrichment timeout is 120 seconds,
+# so a programme of 60 stories against a provider that is simply not running
+# would sit there for two hours producing the extractive result it could have
+# produced immediately.
+LLM_FAILURE_LIMIT = 3
 
 
 # -------------------------------------------------------------------- types
@@ -151,8 +168,9 @@ class Segment:
     # start a headline on a real unit of speech rather than mid-name.
     cue_starts: set[int] = field(default_factory=set)
     # Name spellings the LLM corrected, as (asr_form, corrected). Empty
-    # without LLM_API_KEY. Surfaced rather than applied silently: a
-    # correction is a claim, and the reader should be able to see it.
+    # unless LLM_CORRECT_NAMES is on, which it is not by default. Surfaced
+    # rather than applied silently: a correction is a claim, and the reader
+    # should be able to see it.
     name_corrections: list[tuple[str, str]] = field(default_factory=list)
     enriched_by: str = ""
 
@@ -738,6 +756,9 @@ def segment_transcript(
     min_segment_ms: int | None = None,
     analyse: bool = True,
     refine: bool = True,
+    progress: Callable[[int, int, Segment], None] | None = None,
+    cache: EnrichmentCache | None = None,
+    allow_model: bool = True,
 ) -> tuple[list[Segment], list[Boundary], list[Block]]:
     """Split ``transcript`` into stories and analyse each one.
 
@@ -819,20 +840,45 @@ def segment_transcript(
         segments.append(segment)
 
     if analyse:
-        analyse_segments(segments)
+        analyse_segments(
+            segments, progress=progress, cache=cache, allow_model=allow_model
+        )
         repair_segment_names(segments)
     return segments, boundaries, blocks
 
 
-def analyse_segments(segments: list[Segment]) -> None:
-    """Run the full NLP pipeline over each segment, in place."""
+def analyse_segments(
+    segments: list[Segment],
+    *,
+    progress: Callable[[int, int, Segment], None] | None = None,
+    cache: EnrichmentCache | None = None,
+    allow_model: bool = True,
+) -> None:
+    """Run the full NLP pipeline over each segment, in place.
+
+    ``progress`` is called after each segment with ``(done, total, segment)``.
+    A local LLM spends about 20 seconds per story, so a long programme is
+    minutes of work and a caller needs to be able to say so.
+
+    ``cache`` holds headlines already written for this video, so a rebuild does
+    not pay 20 seconds a story again. Passing nothing disables caching entirely,
+    which is what keeps a test run from writing into committed data.
+
+    ``allow_model=False`` uses the cache but never calls the model, which is how
+    an HTTP request stays a request: writing 76 headlines takes 25 minutes, and
+    no client waits that long.
+    """
     from app.services.pipeline import get_pipeline
 
     from app.nlp.stopwords import BROADCAST_FILLER
 
     pipeline = get_pipeline()
-    use_llm = settings.has_llm and settings.llm_enrich_segments
-    for segment in segments:
+    # Ollama needs no key, so availability is per-provider.
+    use_llm = settings.llm_enrich_segments and (
+        settings.llm_provider == "ollama" or settings.has_llm
+    )
+    consecutive_failures = 0
+    for position, segment in enumerate(segments, 1):
         # Broadcast filler is excluded from keywords only. It is not in the
         # general stopword list because that list defines the trained models'
         # feature space; see app.nlp.stopwords.BROADCAST_FILLER.
@@ -852,7 +898,22 @@ def analyse_segments(segments: list[Segment]) -> None:
         segment.headline = synthesise_headline(segment)
 
         if use_llm:
-            _enrich_with_llm(segment)
+            status = _enrich_with_llm(
+                segment, cache=cache, allow_model=allow_model
+            )
+            if status == "unavailable":
+                consecutive_failures += 1
+                if consecutive_failures >= LLM_FAILURE_LIMIT:
+                    # Not reachable, or not answering usefully. Finish the
+                    # programme extractively instead of timing out per story.
+                    use_llm = False
+            else:
+                # A hit, a write, or a deliberate skip -- none of them evidence
+                # that the provider is down.
+                consecutive_failures = 0
+
+        if progress is not None:
+            progress(position, len(segments), segment)
 
 
 def synthesise_headline(segment: Segment, *, max_length: int = 120) -> str:
@@ -889,19 +950,68 @@ def synthesise_headline(segment: Segment, *, max_length: int = 120) -> str:
     return headline or f"ช่วง {segment.timecode}"
 
 
-def _enrich_with_llm(segment: Segment) -> None:
-    """Replace the headline and entities with LLM-corrected ones.
+def _enrich_with_llm(
+    segment: Segment,
+    *,
+    cache: EnrichmentCache | None = None,
+    allow_model: bool = True,
+) -> str:
+    """Replace the headline (and, if enabled, the entities) with the model's.
 
-    Only reachable with ``LLM_API_KEY`` set. Every failure leaves the extractive
-    result in place: a clumsier headline is a far better outcome than a story
-    that fails to appear.
+    Returns what happened -- ``"cache"``, ``"model"``, ``"skipped"`` or
+    ``"unavailable"`` -- rather than a bare success flag, because the caller
+    treats them differently: only ``"unavailable"`` is evidence the provider is
+    down, and a skip must not make it stop reading the cache.
+
+    Every failure leaves the extractive result in place: a clumsier headline is a
+    far better outcome than a story that fails to appear.
     """
-    from app.nlp.llm_enrich import LLMUnavailable, apply_corrections, enrich_segment
+    from app.nlp.llm_enrich import (
+        Enrichment,
+        LLMUnavailable,
+        _clean_headline,
+        apply_corrections,
+        enrich_segment,
+    )
 
-    try:
-        enrichment = enrich_segment(segment.text)
-    except LLMUnavailable:
-        return
+    enrichment: Enrichment | None = None
+    cached = cache.get(segment.text) if cache is not None else None
+    if cached is not None:
+        # Cleaned again on the way out, not merely on the way in: the model
+        # labels its own output ("พาดหัว: ...") and restates the question often
+        # enough that the rules were tightened after the first programme was
+        # written, and a cached headline should benefit from that rather than
+        # stay frozen at the rule that was current when it was written.
+        candidate = Enrichment(
+            headline=_clean_headline(cached.get("headline")),
+            entities=list(cached.get("entities") or []),
+            corrections=[
+                (pair[0], pair[1])
+                for pair in (cached.get("corrections") or [])
+                if isinstance(pair, (list, tuple)) and len(pair) == 2
+            ],
+        )
+        # An entry that cleans down to nothing -- a completion that was only its
+        # own label -- is not a result. Ask again if allowed, rather than
+        # marking the story as enriched with an empty headline.
+        if candidate.usable:
+            enrichment = candidate
+
+    if enrichment is None:
+        if not allow_model:
+            return "skipped"
+        try:
+            enrichment = enrich_segment(segment.text)
+        except LLMUnavailable:
+            return "unavailable"
+        cached = None
+        if cache is not None:
+            cache.put(
+                segment.text,
+                headline=enrichment.headline,
+                entities=enrichment.entities,
+                corrections=enrichment.corrections,
+            )
 
     if enrichment.headline:
         segment.headline = enrichment.headline
@@ -913,6 +1023,7 @@ def _enrich_with_llm(segment: Segment) -> None:
         # and not the other would read as two different people.
         segment.summary = apply_corrections(segment.summary, enrichment.corrections)
     segment.enriched_by = "llm"
+    return "cache" if cached is not None else "model"
 
 
 def repair_segment_names(segments: list[Segment]) -> None:

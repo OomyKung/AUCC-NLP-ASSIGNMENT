@@ -152,8 +152,32 @@ class Settings(BaseSettings):
     llm_model: str = "claude-sonnet-5"
     llm_base_url: str = "https://api.anthropic.com/v1/messages"
 
-    # Use the LLM to repair ASR-mangled Thai names and write story headlines.
-    # Inert without LLM_API_KEY. It exists because every local approach was
+    # Which model serves the enrichment.
+    #   ollama    : a model running locally. Free, no key, no account, and no
+    #               data leaves the machine. Needs `ollama serve` and a pulled
+    #               model. ~20s per story on CPU.
+    #   anthropic : the hosted API. Needs LLM_API_KEY and costs money.
+    llm_provider: Literal["ollama", "anthropic"] = "ollama"
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_model: str = "qwen2.5:7b"
+
+    # Let the model rewrite Thai names it thinks the ASR got wrong.
+    #
+    # OFF, and it must stay off for local models. Measured on qwen2.5:7b, which
+    # was explicitly instructed not to guess:
+    #     อนุทินชาวรกูล      -> อนุทินชื่นกล่าว      (invented)
+    #     อัถสิทธิ์เวชชาชีวะ -> อัชสิทธิ์เวชชาชีวะ  (still wrong)
+    #     อำสินสักสิภาพร...  -> อำพันสิทธิ์จันทวิสูตร (invented)
+    # A 7B model does not know individual Thai politicians or athletes, so it
+    # produces plausible-looking wrong names -- strictly worse than a visibly
+    # garbled one, because a reader cannot tell it happened. Headlines need no
+    # such knowledge, which is why those are on by default and this is not.
+    llm_correct_names: bool = False
+
+    # Let the LLM write the story headlines (and, with llm_correct_names,
+    # repair names). Inert when no provider answers -- three failures and the
+    # rest of the programme falls back to the extractive headline. It exists
+    # because every local approach to the name half was
     # measured and could not do it: Thai soundex does not match the manglings
     # (the ASR inserts syllables), PyThaiNLP's 22k name corpora do not contain
     # the names, and cross-referencing the chat and transcript only works when

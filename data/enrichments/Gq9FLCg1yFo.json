@@ -1,0 +1,443 @@
+{
+ "video_id": "Gq9FLCg1yFo",
+ "entries": {
+  "055703c316a86f49489c:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ทีมวอลเลย์บอลไทยได้รับการต้อนรับจากนายกรัฐมนตรีที่ทำเนียบรัฐบาล",
+   "entities": [],
+   "corrections": []
+  },
+  "084bcdf9229778332779:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ลิงแสมถูกยิงตาย ชาวบ้านวิ่งตามหาผู้ก่อเหตุในสงขลา",
+   "entities": [],
+   "corrections": []
+  },
+  "5fb0185588894a5b4d48:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "อุบัติเหตุรถชนหนักทำคนเสียชีวิตบนถนนบางคล้าฉะเชิงเทรา",
+   "entities": [],
+   "corrections": []
+  },
+  "8d57a6838fa4a55a7152:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "คนเช่าห้องถูกยิงในห้องแถวนครปฐม",
+   "entities": [],
+   "corrections": []
+  },
+  "4a9dd99bc7c88690e6d4:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "นรินทร์สุขพลยิงคนทิ้งมอไซค์หนีพัทยา",
+   "entities": [],
+   "corrections": []
+  },
+  "12579f23ede7b070e7d1:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ทหารสหรัฐเข้าพัทยาเยี่ยมเรือบรรทุกเครื่องบิน USS อับราฮัลคอน",
+   "entities": [],
+   "corrections": []
+  },
+  "502f67437b196217b639:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "กำลังพล USS อับราฮัลินคอท่องเที่ยวพัทยาคึกคัก",
+   "entities": [],
+   "corrections": []
+  },
+  "ba2b0fb78c84045aa8f2:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ทหารสหรัฐทดลองอาหารไทยในพัทยา",
+   "entities": [],
+   "corrections": []
+  },
+  "f604b854d2501f111444:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "พ่อแม่ทุ่มชีวิตกู้hotel200ล้านล้มเหลวเหลือห้องเดียว",
+   "entities": [],
+   "corrections": []
+  },
+  "ca7945b4b6eb89397b96:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ข่าวช่อง 8 ลุยชนข่าวเจาะลึกทุกประเด็น",
+   "entities": [],
+   "corrections": []
+  },
+  "ceceb975f64aeef16f0b:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "รถกระบะชนรถตำรวจบนสะพานปรีดีธำรง 3 คนได้รับบาดเจ็บ",
+   "entities": [],
+   "corrections": []
+  },
+  "3ff778613ca7dc35029b:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "อดีตอาสาสมัครกู้ภัยขับรถไล่แฟนเก่าจนคนขับมอเตอร์ไซค์เสียชีวิตบนถนนรัชดาภิเษก",
+   "entities": [],
+   "corrections": []
+  },
+  "3c52b6c57831ce946059:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "แม่แจ้งความหลังลูกสาวถูกดักขับรถชนร้านอาหาร",
+   "entities": [],
+   "corrections": []
+  },
+  "d6bcadfaeaba07999286:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "เพื่อนสนิทนายท็อปเปิดเผยพฤติกรรมเปลี่ยนแปลงก่อนเหตุการณ์",
+   "entities": [],
+   "corrections": []
+  },
+  "c70e5ce9885888011e1a:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "พี่ชายขี่มอเตอร์ไซค์รับมุกหนีร้ายจนเกิดเหตุเศร้า",
+   "entities": [],
+   "corrections": []
+  },
+  "b9e0e178d7c271251b24:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ตำรวจรวบตัวชายคลุ้มคลั่งหลังปืนยิงกับเจ้าหน้าที่ในบ่อน้ำฉะเชิงเทรา",
+   "entities": [],
+   "corrections": []
+  },
+  "e6e287d60ac60ac80d95:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ท่านนายกฯมอบรางวัลนักวอลเลย์บอลหญิงทีมชาติไทย",
+   "entities": [],
+   "corrections": []
+  },
+  "be69b5fac9282c788562:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ลูกค้าแห่เข้าพักโรงแรมล้มเหลวพลิกชีวิตด้วยรายการทอลก์โชว์",
+   "entities": [],
+   "corrections": []
+  },
+  "a9cdf5a845c019a5cd29:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "คนข่าวตัวจริงนำทัพลุยชนข่าวทุกวันช่อง 8",
+   "entities": [],
+   "corrections": []
+  },
+  "389c1c2ea26ae5354072:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ตำรวจจับกุมตัวผู้ต้องหาขนยาบ้า 2.8 ล้านเม็ดในเชียงราย",
+   "entities": [],
+   "corrections": []
+  },
+  "72adeced3be13bf19949:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ลูกค้าร้านทองหลุดมือขโมยแหวนทองหนีออกจากโรงพักวังน้อย",
+   "entities": [],
+   "corrections": []
+  },
+  "62e0f5be6a494e1e078e:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ตำรวจจับหนุ่มวิ่งราวทรัพย์ยอมรับสารภาพในปทุมธานี",
+   "entities": [],
+   "corrections": []
+  },
+  "24dd6c0615b2a9e91d48:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "เด็กสองคนได้รับบาดเจ็บจากเหตุการณ์ทะเลาะวิวาทของผู้ใหญ่",
+   "entities": [],
+   "corrections": []
+  },
+  "916b02d74603a7770f70:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "พนักงานสอบสวนเรียกคู่กรณีทะเลาะวิวาททางโซเชียลมาสอบ",
+   "entities": [],
+   "corrections": []
+  },
+  "a840f33e9e1a15864681:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "โรงงานบางเพรียงพัฒนาเกิดเหตุระเบิดไฟลุกไหม้ 3 คนได้รับบาดเจ็บ",
+   "entities": [],
+   "corrections": []
+  },
+  "2ad71c9ab2c44754c1f7:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "แก๊ง Call Center เยาะเย้ยเหยื่อหลังแจ้งความ",
+   "entities": [],
+   "corrections": []
+  },
+  "4bcd7b72113e1715f152:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ตำรวจสืบสวนสอบสวนอาชญกรรมทางเทคโนโลยีสืบเสาะแก๊ง Call Center ฉ้อโกงคุณยาย",
+   "entities": [],
+   "corrections": []
+  },
+  "145e4380373efa9a7813:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "นักมวยลูกครึ่งพาแฟนสาวเที่ยวเชียงใหม่เสียชีวิตจากอาการคลั่ง",
+   "entities": [],
+   "corrections": []
+  },
+  "37b74b692d96dd568976:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "คุยข่าวเช้าช่อง 8 เทพกิจฉัสุริยวงศ์วิยดาพีรักกุลต้นกล้าชยนันท์บุญญิตางามสรรพสิลป์นิติรัตน์บัวจันทร์คุยข่าวเช้าทุกวัน",
+   "entities": [],
+   "corrections": []
+  },
+  "2b9b432f4bbfa730494b:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ปลัดอาวุโสจับกุมชายคลั่งถือมีดในปากพนัง",
+   "entities": [],
+   "corrections": []
+  },
+  "9b27176014f3ede01c2f:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ตำรวจโคราชจับผู้ต้องหาหนีการจ่ายค่าปรับวิ่งหนีไปว่ายน้ำหนี justice",
+   "entities": [],
+   "corrections": []
+  },
+  "ae12779b5e4f1458a8d3:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ตำรวจจับกุมผู้ต้องหาหนีคดียาเสพติดและลักทรัพย์บนลานหญ้าโม",
+   "entities": [],
+   "corrections": []
+  },
+  "cd9dfb305fe6b1c39b07:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "นักมวยลูกครึ่งไทย-อเมริกันก่อเหตุรุนแรงที่เชียงใหม่",
+   "entities": [],
+   "corrections": []
+  },
+  "917171fce809e14546cb:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "น้องปาลมอโลซินีถูกฆ่าในเหตุการณ์ที่เกี่ยวข้องกับเคเดน",
+   "entities": [],
+   "corrections": []
+  },
+  "90486099d2672ebd470d:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ข่าวช่อง8เทพกิจฉัตรสุริยวงศ์วิยดาพีรัต้นกล้าชยนันท์บุญยิตางามสรรพสิน์นิติรัตน์บัวจันทร์คุยข่าวเช้าทุกวันจันทร์ถึงอาทิตย…",
+   "entities": [],
+   "corrections": []
+  },
+  "0ee9f74cb4cb2455ddbb:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "จอนนี่มือปราบถูกส่งตัวเข้าโรงพยาบาลด้วยเหตุการณ์เมาสุราอาละวาด",
+   "entities": [],
+   "corrections": []
+  },
+  "8c134ff0201fc3e71bfd:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "มือปราบอำนาจรื่นเริงจับล็อกครูจากศรีราชา",
+   "entities": [],
+   "corrections": []
+  },
+  "450777290d0514078843:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "นักเรียนถูก 4 รุม 1 โรงเรียนสะพาน 4 ระยอง อาวุธยังวนเวียน",
+   "entities": [],
+   "corrections": []
+  },
+  "2a5903511b53e2ea0507:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "วงจรปิดจับภาพผู้ต้องสงสัยฉ้อโกงจำนำทองฉะเชิงเทรา",
+   "entities": [],
+   "corrections": []
+  },
+  "0f34f82541a4b5d43529:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ตลาดโต้รุ่งลพบุรีหนุ่มใหญ่ควงปืน 2 กระบอกเข้ามา",
+   "entities": [],
+   "corrections": []
+  },
+  "463e055b4992d4ab573a:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "พ่อค้าก๋วยเตี๋ยวถูกยิงเสียชีวิต ผู้ต้องหาปิดชีพหลังถูกกล่าวหาคดีหนี้สิน",
+   "entities": [],
+   "corrections": []
+  },
+  "ab76248e40a3bc5ae8b6:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ลูกชายพ่อค้าก๋วยเตี๋ยวกล่าวถึงเหตุปะทะเกี่ยวข้องกับการกู้ยืมเงิน",
+   "entities": [],
+   "corrections": []
+  },
+  "6fc2af0e1eafa9e667de:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ตำรวจลพบุรีจับกุมคนร้ายยิงผู้ตายนาน 2-3 วัน",
+   "entities": [],
+   "corrections": []
+  },
+  "872c8cf6a8ce096972e5:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "เทพกิจฉัตร์คุยข่าวเช้าทุกวัน",
+   "entities": [],
+   "corrections": []
+  },
+  "84af2e4b53aeda2839d8:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ไฟไหม้โรงงานรับซื้อพลาสติกรีไซเคิลในอยุธยา",
+   "entities": [],
+   "corrections": []
+  },
+  "0fe6361a83145d5db4dc:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "AI เปลี่ยนแพลตฟอร์ม ผู้ใช้ต้องปรับโมเดลเป็นโปร",
+   "entities": [],
+   "corrections": []
+  },
+  "2be0cca66b520f27c134:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "รัฐมนตรีดิจิทัลชี้AI Passใช้ไม่ทั่วถึง-ปปช.ตรวจสอบ",
+   "entities": [],
+   "corrections": []
+  },
+  "238baccfd7183c9f3bb0:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ผู้ใช้สมัคร AI Plus ล้นล้าน ชัยชนกชี้เลือก AI ต้องพิถีพิถัน",
+   "entities": [],
+   "corrections": []
+  },
+  "bbe335a8d15c20478ccf:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "วิยดาพีรักกุลท่านกล้าชยนันท์บุญญิตางามสรรพสิน์นิติรัตน์บัวจันทร์คุยข่าวเช้าทุกวันจันทร์ถึงอาทิตย์เวลา 5:30 น.",
+   "entities": [],
+   "corrections": []
+  },
+  "df468871fb274ad29627:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ขยี้ข่าวเช้าช่อง8ปลุกคนไทยทุกเช้า",
+   "entities": [],
+   "corrections": []
+  },
+  "470055c36d938d0e677f:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "กัญชัยจอมพลังเปิดปมร้าวกับทนายตัม",
+   "entities": [],
+   "corrections": []
+  },
+  "295cbc11a239052558f3:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "เสือดุสิตถูกวิจารณ์หลังแชร์เพจล้อเล่นทำให้คนอื่นเครียด",
+   "entities": [],
+   "corrections": []
+  },
+  "f58b422f33e16303a491:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ทนายตั้ม vs คุณกัน ยิ่งโตยิ่งทะเลาะ",
+   "entities": [],
+   "corrections": []
+  },
+  "4b6fd6a9dc7912a52913:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "นรเสษนาหนองตูมโพสต์ถกกันจอมพลังเรื่องมูลนิธิ",
+   "entities": [],
+   "corrections": []
+  },
+  "3c3ee8d30e048fdd5779:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ปลุกคนไทยด้วยข่าวทุกเช้าฉับไวบนเรือนิธิ์ช่อง 8",
+   "entities": [],
+   "corrections": []
+  },
+  "50dd4a0af3550e25758a:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ทนายนรเสษนาหนองตูมยื่นคำร้องตรวจสอบมูลนิธิกันจอมพลังช่วยสู้",
+   "entities": [],
+   "corrections": []
+  },
+  "fc3026e0647ccf80421a:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ทนายตั้มโพสต์เรียกร้องตรวจสอบการบริจาคมูลนิธิ",
+   "entities": [],
+   "corrections": []
+  },
+  "8c2daaf67580303dbb15:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ดูแลข้อเข่าผู้สูงอายุด้วยคอลลาเจน Type 2",
+   "entities": [],
+   "corrections": []
+  },
+  "b7446f771619ede0bf5f:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "สินค้าลดราคาแรงเหลือ 899 บาทเท่านั้นโทรเลย 0203030033",
+   "entities": [],
+   "corrections": []
+  },
+  "d440415d1db90e47bcb8:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "นายกรัฐมนตรีมอบเงินรางวัลนักกีฬาทีมยูนิคอร์น",
+   "entities": [],
+   "corrections": []
+  },
+  "782f741c9cc31d6c5fd8:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ทนายตั้มยันยังไม่ได้รับเอกสารตรวจสอบบ้าน 250 ล้านของกันจอมพลัง",
+   "entities": [],
+   "corrections": []
+  },
+  "31dafbb9b35d6143a944:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ทนายตั้มยื่นหนังสือปลัดกระทรวงมหาดไทยตรวจสอบมูลนิธิการจอมพลังช่วยสู้",
+   "entities": [],
+   "corrections": []
+  },
+  "9233808cbaa375d435c1:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "หมอปากแซ่บถูกกล่าวหาใช้คำพูดไม่สุภาพกับคนไข้",
+   "entities": [],
+   "corrections": []
+  },
+  "bc3e0bd921e1230e8561:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "แพทย์โทรศัพท์ดุผู้หญิงขอส่งตัวรักษา",
+   "entities": [],
+   "corrections": []
+  },
+  "5630e3a29db742c96ce6:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "บอยท่างิ้วถูกจับกุมเป็นเอเย่นยาเสพติดรายใหญ่ในรีสอร์ทนครศรีธรรมราช",
+   "entities": [],
+   "corrections": []
+  },
+  "35be2779e05a806c3373:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "คุณหมอคลินิกเอกชนข่มขู่ผู้ป่วยป่วยไต",
+   "entities": [],
+   "corrections": []
+  },
+  "3861bca7b3d66b2ce043:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "รัฐมนตรีสาธารณสุขเปิดประชุมวิชาการ 30 บาทรักษาทุกโรค",
+   "entities": [],
+   "corrections": []
+  },
+  "14a5aec51e7775deede8:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ระบบสุขภาพทุกสุขดิบบริการ30บาทครอบคลุมทุกโรค",
+   "entities": [],
+   "corrections": []
+  },
+  "d2c629d1a5d27f158f66:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ตำรวจไม่รับแจ้งความ ปัญหาชายแดนใต้ถูกเลื่อนพิจารณา",
+   "entities": [],
+   "corrections": []
+  },
+  "c6120c2f10477e82b46f:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ไอซ์รัชโนกขอถอนคำพูดว่ารัฐบาลภูมิใจไทยรักตัวกลัวตาย",
+   "entities": [],
+   "corrections": []
+  },
+  "85f88b21e9d4360ade01:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "รังสิมันรมโต้ท่านประธานสภาฯ หลังถูกกล่าวหาหมิ่นประมาท",
+   "entities": [],
+   "corrections": []
+  },
+  "cb34468774eab70310a3:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "รังสีวรโรมยติซ้อนยติในสภา",
+   "entities": [],
+   "corrections": []
+  },
+  "aa37fae741963ee1f055:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "การประชุมสภาฯลากยาว 6 ชั่วโมงไม่สำเร็จเรื่องสำคัญ",
+   "entities": [],
+   "corrections": []
+  }
+ }
+}
