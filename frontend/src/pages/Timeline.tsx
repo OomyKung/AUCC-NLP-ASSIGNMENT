@@ -297,6 +297,23 @@ function SegmentCard({ segment }: { segment: NewsSegment }) {
             </p>
           )}
 
+          {/* Keywords used to BE the headline. Now the headline is a real
+              phrase, so they move here — still visible, no longer pretending
+              to be a title. */}
+          {segment.keywords.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="คำสำคัญ">
+              {segment.keywords.slice(0, 6).map((word) => (
+                <li
+                  key={word}
+                  className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                  lang="th"
+                >
+                  {word}
+                </li>
+              ))}
+            </ul>
+          )}
+
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <a
               href={segment.youtube_url}

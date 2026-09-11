@@ -144,6 +144,9 @@ class Segment:
     entities: list[dict] = field(default_factory=list)
     boundary_confidence: float = 0.0
     boundary_reasons: list[str] = field(default_factory=list)
+    # Character offsets inside `text` where a transcript cue begins. Used to
+    # start a headline on a real unit of speech rather than mid-name.
+    cue_starts: set[int] = field(default_factory=set)
 
     @property
     def duration_ms(self) -> int:
@@ -522,6 +525,7 @@ def segment_transcript(
             start_ms=start_ms,
             end_ms=end_ms,
             text=text,
+            cue_starts=transcript.cue_start_offsets(start_ms, end_ms),
             boundary_confidence=boundary.confidence if boundary else 1.0,
             boundary_reasons=list(boundary.reasons) if boundary else ["programme-start"],
         )
@@ -560,19 +564,34 @@ def analyse_segments(segments: list[Segment]) -> None:
 
 
 def synthesise_headline(segment: Segment, *, max_length: int = 120) -> str:
-    """A readable one-line name for a story.
+    """A readable one-line description of the story.
 
-    Leads with the keywords, because that is what distinguishes one story from
-    the next; the summary's first clause is a poor headline on broadcast speech,
-    which opens with filler far more often than a news article does.
+    Prefers a real phrase pulled out of what was actually said (see
+    :mod:`app.nlp.headline`). Joining the top keywords -- which is what this
+    used to do -- produced titles like ``ติดตาม · นิติ · ศุกร์ · เช้านี้``, four
+    disconnected words that describe nothing.
+
+    Falls back through summary, then keywords, then the timecode, so a story is
+    never nameless: on a rambling or badly transcribed segment there may be no
+    dense span to find, and a weak title beats a blank one.
     """
-    if segment.keywords:
-        headline = " · ".join(segment.keywords[:4])
-    elif segment.summary:
+    from app.nlp.headline import extract_headline
+    from app.nlp.keyword_extractor import TfidfKeywordExtractor
+
+    extractor = TfidfKeywordExtractor.load()
+    headline = extract_headline(
+        segment.text,
+        keywords=segment.keywords,
+        idf=extractor if extractor.is_fitted else None,
+        cue_starts=segment.cue_starts or None,
+    )
+
+    if not headline and segment.summary:
         headline = segment.summary
-    else:
-        headline = segment.text
-    headline = re.sub(r"\s+", " ", headline).strip()
+    if not headline and segment.keywords:
+        headline = " · ".join(segment.keywords[:4])
+
+    headline = re.sub(r"\s+", " ", headline or "").strip()
     if len(headline) > max_length:
         headline = headline[: max_length - 1].rstrip() + "…"
     return headline or f"ช่วง {segment.timecode}"

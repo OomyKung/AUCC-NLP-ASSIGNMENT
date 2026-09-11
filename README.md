@@ -250,6 +250,44 @@ frame. The trade-off is resolution: 320×180 is right for a timeline card and to
 small to read on-screen text. `capture_frame()` is the single place to swap in a
 full-resolution implementation if ffmpeg is ever available.
 
+#### Writing a headline for each story
+
+Joining a story's top keywords produced titles like
+`ติดตาม · นิติ · ศุกร์ · เช้านี้` — four disconnected words describing nothing.
+Each story now gets a real phrase pulled out of what was actually said:
+
+| Before | After |
+|---|---|
+| `ผู้ก่อเหตุ · ครอบครัว · หญิง · เกิดเหตุ` | `เห็นผู้ก่อเหตุขับกระบะเข้าออกซอยหลายรอบแล้วไปจอดดักซุ่ม` |
+| `เจ้าภาพ · คว้าแชมป์ · ตะเกียง · ตั๋ว` | `กิตติพงษ์รัชตะเกียงไกรนำนักกีฬาเข้าพบนายกรัฐมนตรี` |
+| `เครื่องจักร · ฝุ่น · ทำความสะอาด · ถัง` | `จุดเกิดเหตุเป็นเครื่องจักรสำหรับขัดทรายแล้วก็ถังดูดฝุ่น` |
+
+There is no headline in the source to find, and sentence segmentation does not
+help: on unpunctuated ASR speech `crfcut` returns run-on blocks of 700+
+characters next to fragments of 2. So the headline is the most
+**information-dense span** of real speech — every 7–20 token window scored on IDF
+mass, overlap with the story's own keywords, and penalties for filler and bare
+digits, then trimmed so it cannot open or close on a dangling particle.
+
+Two fixes came from output that was visibly broken:
+
+- **Offsets are located, not accumulated.** The tokeniser drops whitespace, so
+  cumulative token lengths drift and slices began mid-word (`้วันศุกร์`).
+- **Spans prefer starting on a transcript cue.** A cue is a real unit of speech;
+  without that anchor a span opens on a fragment of a split name
+  (`พงษ์รัชตะเกียงไกร`), because Thai has no spaces and the tokeniser splits
+  inside names as readily as between words.
+
+Keywords did not disappear — they moved onto the card as chips, where they are
+information rather than a pretend title.
+
+**Honest limit:** quality is bounded by the transcript. ASR mangles names
+(`ชาญวีรกูล` → `ชาวรกูล`) and a rambling presenter gives nothing dense to
+extract, so roughly two thirds of stories get a genuinely descriptive headline
+and the rest are on-topic but clumsy. Setting `LLM_API_KEY` is the route to a
+generated headline, which is markedly better; the seam already exists for the
+summariser.
+
 #### Jumping straight to the moment
 
 Every story carries `https://www.youtube.com/watch?v=<id>&t=<seconds>s`, aimed two
@@ -655,7 +693,7 @@ thai-news-nlp/
 │   │       ├── entities.py          rule/gazetteer NER
 │   │       └── backends/            sklearn, gazetteer, lexicon, transformer
 │   ├── models/                      trained artefacts + metrics.json (committed)
-│   ├── tests/                       281 tests
+│   ├── tests/                       287 tests
 │   ├── build_dataset.py             merge + validate the labelled dataset
 │   ├── train.py                     train the classifiers
 │   ├── evaluate.py                  write models/metrics.json
@@ -988,7 +1026,7 @@ failure, so the application never breaks without a key.
 ## Testing
 
 ```powershell
-cd backend  && python -m pytest      # 281 tests
+cd backend  && python -m pytest      # 287 tests
 cd frontend && npm run test          # 13 rendering tests
 ```
 

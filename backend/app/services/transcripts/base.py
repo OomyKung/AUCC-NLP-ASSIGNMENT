@@ -125,6 +125,26 @@ class Transcript:
         ]
         return "".join(parts)
 
+    def cue_start_offsets(self, start_ms: int, end_ms: int) -> set[int]:
+        """Character offsets where each cue begins inside ``text_between``.
+
+        Lets a caller align to real speech-unit boundaries instead of guessing
+        from tokenisation, which cannot see them: Thai has no spaces, so a
+        tokeniser splits inside names as readily as between words.
+        """
+        offsets: set[int] = set()
+        position = 0
+        for cue in self.cues:
+            if (
+                cue.text
+                and not cue.non_speech
+                and cue.start_ms < end_ms
+                and cue.end_ms > start_ms
+            ):
+                offsets.add(position)
+                position += len(cue.text)
+        return offsets
+
     def as_dict(self) -> dict:
         return {
             "video_id": self.video_id,

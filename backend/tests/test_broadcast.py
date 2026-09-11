@@ -369,3 +369,89 @@ def test_smoothing_keeps_a_genuine_two_block_story():
         "sports",
         "crime",
     ]
+
+
+# --------------------------------------------------------------------------
+# Headlines
+# --------------------------------------------------------------------------
+
+
+def test_token_offsets_survive_whitespace():
+    """The tokeniser drops whitespace, so cumulative token lengths drift and
+    every slice after the first space starts mid-word (``้วันศุกร์``)."""
+    from app.nlp.headline import token_offsets
+
+    text = "ตำรวจ จับกุม ผู้ต้องหา"
+    tokens = ["ตำรวจ", "จับกุม", "ผู้ต้องหา"]
+
+    offsets = token_offsets(text, tokens)
+
+    for token, offset in zip(tokens, offsets, strict=True):
+        assert text[offset : offset + len(token)] == token
+
+
+def test_headline_is_a_phrase_not_a_keyword_list():
+    """The whole point: ``ติดตาม · นิติ · ศุกร์ · เช้านี้`` described nothing."""
+    from app.nlp.headline import extract_headline
+
+    text = (
+        "สวัสดีครับท่านผู้ชมนะครับ"
+        "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางมูลค่ากว่าสิบล้านบาท"
+        "ที่บ้านพักย่านชานเมืองนะครับ"
+    )
+
+    headline = extract_headline(text, keywords=["ตำรวจ", "จับกุม", "ยาเสพติด"])
+
+    assert headline
+    assert "·" not in headline
+    assert "ตำรวจ" in headline or "จับกุม" in headline
+
+
+def test_headline_does_not_start_or_end_on_a_particle():
+    from app.nlp.headline import extract_headline
+
+    text = (
+        "นะครับรถกระบะเสียหลักพุ่งชนเสาไฟฟ้าริมถนนมีผู้ได้รับบาดเจ็บสามราย"
+        "เจ้าหน้าที่กู้ภัยนำส่งโรงพยาบาลแล้วนะครับ"
+    )
+
+    headline = extract_headline(text, keywords=["รถกระบะ", "เสาไฟฟ้า", "บาดเจ็บ"])
+
+    assert headline
+    assert not headline.startswith(("นะ", "ครับ", "ค่ะ", "ก็", "แล้ว"))
+    assert not headline.endswith(("นะ", "ก็", "ที่", "และ", "ของ"))
+
+
+def test_headline_prefers_starting_on_a_cue_boundary():
+    """A cue is a real unit of speech. Without this the span can open on a
+    fragment of a split name, because Thai has no spaces and the tokeniser
+    splits inside names as readily as between words."""
+    from app.nlp.headline import extract_headline
+
+    first = "ช่วงนี้อากาศร้อนมากนะครับ"
+    second = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
+    text = first + second
+
+    headline = extract_headline(
+        text,
+        keywords=["ตำรวจ", "จับกุม", "ยาเสพติด"],
+        cue_starts={0, len(first)},
+    )
+
+    assert headline.startswith("ตำรวจ")
+
+
+def test_headline_returns_empty_on_text_too_short_to_describe():
+    from app.nlp.headline import extract_headline
+
+    assert extract_headline("สวัสดี", keywords=["สวัสดี"]) == ""
+    assert extract_headline("", keywords=[]) == ""
+
+
+def test_segment_headline_falls_back_rather_than_being_blank():
+    """A rambling or badly transcribed story may have no dense span. A weak
+    title beats a nameless card."""
+    segment = Segment(index=0, start_ms=185_000, end_ms=245_000, text="อ่า")
+    segment.keywords = ["ตำรวจ", "จับกุม"]
+
+    assert synthesise_headline(segment)
