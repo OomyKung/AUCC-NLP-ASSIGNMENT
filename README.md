@@ -188,6 +188,79 @@ Two honest observations:
 - **Training was decisive for sentiment** (+0.259), where a word-list approach
   cannot capture context.
 
+### Does a transformer help? No, not at this data size
+
+WangchanBERTa is the standard Thai pre-trained language model, and the character
+n-gram ablation suggested subword modelling should suit Thai. It was fine-tuned
+on the same 597 training rows and scored on the same 150 held-out rows.
+
+| Sentiment approach | Accuracy | Macro-F1 |
+|---|---|---|
+| **TF-IDF + logistic regression** | **0.740** | **0.682** |
+| WangchanBERTa fine-tuned (597 rows) | 0.547 | 0.531 |
+| Lexicon (rules, no training) | 0.427 | 0.422 |
+| Off-the-shelf Thai sentiment model | 0.253 | 0.200 |
+
+The transformer loses to TF-IDF by **0.151 macro-F1**. This is not a single
+unlucky run — three hyperparameter settings were tried and all lost:
+
+| Epochs | LR | Batch | Class weights | Macro-F1 |
+|---|---|---|---|---|
+| 3 | 2e-5 | 8 | yes | **0.531** |
+| 4 | 2e-5 | 16 | no | 0.498 |
+| 10 | 3e-5 | 16 | yes | 0.346 |
+
+Training *longer* made it worse: at 10 epochs the model collapsed to predicting
+`negative` for 121 of 150 rows. 597 examples is simply too little to fine-tune a
+110M-parameter model, while TF-IDF over character n-grams is well suited to
+exactly this regime.
+
+The off-the-shelf model is a second, independent instance of the domain-mismatch
+result: it was trained on Wisesight social-media text and predicts `neutral` for
+**143 of 150** news rows. Comparing predicted distributions against the truth
+(69 positive / 31 neutral / 50 negative) makes the failure mode legible:
+
+| Model | Predicted pos / neu / neg |
+|---|---|
+| TF-IDF | 79 / 24 / 47 — well calibrated |
+| WangchanBERTa fine-tuned | 47 / 32 / 71 |
+| Lexicon | 49 / 69 / 32 — over-predicts neutral |
+| Off-the-shelf | 1 / 143 / 6 — collapsed |
+
+Reproduce with `python train_transformer.py` then `python compare_models.py`.
+The transformer needs `torch`, `transformers`, `sentencepiece` **and**
+`protobuf`; without protobuf, transformers routes WangchanBERTa's SentencePiece
+vocabulary to a TikToken converter and fails with a misleading error.
+
+### Ablations
+
+| Experiment | Configuration | Macro-F1 |
+|---|---|---|
+| **Aggregation** | whole document | **0.725** |
+| | per-sentence + majority vote | 0.675 |
+| **Features (sentiment)** | character n-grams only | **0.697** |
+| | word + character | 0.682 |
+| | word only | 0.613 |
+| **Negation protection** | negators removed | **0.625** |
+| | negators protected | 0.613 |
+
+Aggregating text before classification gains **+0.051 macro-F1**, which is the
+evidence for grouping chat messages into windows rather than classifying each
+one alone.
+
+Character n-grams alone beat word features by **+0.069** on sentiment. Thai is
+written without spaces, so tokenisation is itself a model that can fail; a
+character view does not depend on it being right.
+
+Protecting negators from stopword removal did **not** help the trained
+classifier (−0.012, within noise on 150 rows). The token-level effect is real —
+`ไม่ดี` reduces to `['ดี']` when unprotected — and it matters for the lexicon
+backend, where negation is handled explicitly. But character n-grams already
+capture `ไม่ดี` as a character sequence, so the word-level protection is
+redundant once they are present. Reported as measured rather than as assumed.
+
+Reproduce with `python ablation.py`.
+
 ### Best and worst classes
 
 | Strong | F1 | Weak | F1 |

@@ -26,6 +26,12 @@ venv/
 #   python build_dataset.py && python train.py && python evaluate.py
 backend/models/*.joblib
 
+# Fine-tuned transformer weights (~420 MB each). Regenerate with:
+#   pip install torch transformers sentencepiece protobuf
+#   python train_transformer.py
+# Their metrics ARE committed, so the comparison tables stay reproducible.
+backend/models/wangchanberta_*/
+
 # ---- Node / frontend ----
 node_modules/
 dist/

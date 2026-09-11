@@ -49,7 +49,12 @@ DATASET = ROOT / "data" / "news_dataset.csv"
 MODEL_NAME = "airesearch/wangchanberta-base-att-spm-uncased"
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
-MAX_LENGTH = 256
+# Measured on the dataset: the longest document is 51 subword tokens and the
+# 99th percentile is 45. Padding every sequence to 256 (the first attempt)
+# wasted roughly 16x the attention memory -- self-attention is O(n^2) in
+# sequence length -- and the run was killed for exhausting RAM. 64 covers
+# every document with headroom.
+MAX_LENGTH = 64
 
 
 class TextDataset(Dataset):
@@ -93,6 +98,7 @@ def train_task(
     epochs: int,
     batch_size: int,
     learning_rate: float,
+    class_weights: bool = True,
 ) -> dict:
     """Fine-tune one classifier and return its metrics."""
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -139,11 +145,15 @@ def train_task(
 
     # Class weights: the sentiment set is imbalanced (345/250/152), and the
     # classical models use balanced weights, so this keeps the comparison fair.
-    counts = np.bincount([to_index[y] for y in y_train], minlength=len(present))
-    weights = torch.tensor(
-        len(y_train) / (len(present) * np.maximum(counts, 1)), dtype=torch.float
-    ).to(device)
-    loss_fn = torch.nn.CrossEntropyLoss(weight=weights)
+    if class_weights:
+        counts = np.bincount([to_index[y] for y in y_train], minlength=len(present))
+        weights = torch.tensor(
+            len(y_train) / (len(present) * np.maximum(counts, 1)), dtype=torch.float
+        ).to(device)
+        loss_fn = torch.nn.CrossEntropyLoss(weight=weights)
+    else:
+        loss_fn = torch.nn.CrossEntropyLoss()
+    print(f"class weights: {class_weights}")
 
     started = time.perf_counter()
     model.train()
@@ -190,6 +200,7 @@ def train_task(
     y_true = [index_to_label[i] for i in truths]
 
     metrics = {
+        "class_weights": class_weights,
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "f1_macro": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
         "f1_weighted": float(
@@ -232,6 +243,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--learning-rate", type=float, default=2e-5)
+    parser.add_argument(
+        "--no-class-weights",
+        action="store_true",
+        help="Train with unweighted cross-entropy (the textbook recipe).",
+    )
     args = parser.parse_args(argv)
 
     if not DATASET.is_file():
@@ -251,6 +267,7 @@ def main(argv: list[str] | None = None) -> int:
             epochs=args.epochs,
             batch_size=args.batch_size,
             learning_rate=args.learning_rate,
+            class_weights=not args.no_class_weights,
         )
 
     path = settings.model_dir / "transformer_metrics.json"

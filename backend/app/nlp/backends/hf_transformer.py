@@ -25,7 +25,9 @@ from app.taxonomy import (
 # Inference batch size. Chat scoring runs over tens of thousands of very short
 # texts, where per-call overhead would otherwise dominate.
 BATCH_SIZE = 16
-MAX_LENGTH = 256
+# Matches training. Chat windows can be longer than a news article, so this
+# is above the training maximum of 51 tokens but far below a wasteful 256.
+MAX_LENGTH = 128
 
 
 class _TransformerBackend:

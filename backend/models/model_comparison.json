@@ -1,0 +1,50 @@
+{
+  "split": {
+    "test_size": 0.2,
+    "random_state": 42
+  },
+  "held_out_rows": 150,
+  "true_distribution": {
+    "negative": 50,
+    "neutral": 31,
+    "positive": 69
+  },
+  "models": {
+    "lexicon (rules, no training)": {
+      "accuracy": 0.4266666666666667,
+      "f1_macro": 0.4224996555050296,
+      "predicted_distribution": {
+        "negative": 32,
+        "neutral": 69,
+        "positive": 49
+      }
+    },
+    "TF-IDF + logistic regression": {
+      "accuracy": 0.74,
+      "f1_macro": 0.6819093695382356,
+      "predicted_distribution": {
+        "negative": 47,
+        "neutral": 24,
+        "positive": 79
+      }
+    },
+    "WangchanBERTa fine-tuned (597 rows)": {
+      "accuracy": 0.5466666666666666,
+      "f1_macro": 0.5311157552536863,
+      "predicted_distribution": {
+        "negative": 71,
+        "neutral": 32,
+        "positive": 47
+      }
+    },
+    "off-the-shelf: wangchan-sentiment-thai-text-model": {
+      "accuracy": 0.25333333333333335,
+      "f1_macro": 0.19972632731253423,
+      "predicted_distribution": {
+        "negative": 6,
+        "neutral": 143,
+        "positive": 1
+      }
+    }
+  }
+}
