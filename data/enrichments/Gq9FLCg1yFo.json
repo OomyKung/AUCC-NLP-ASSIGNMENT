@@ -438,6 +438,18 @@
    "headline": "การประชุมสภาฯลากยาว 6 ชั่วโมงไม่สำเร็จเรื่องสำคัญ",
    "entities": [],
    "corrections": []
+  },
+  "8e7801e004c2bb884c6d:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ผู้ชมถูกกลั่นแกล้งให้เลือก AI ไม่ถูกต้อง",
+   "entities": [],
+   "corrections": []
+  },
+  "7f6dc8ea96b41114a502:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "AI พาสปอร์ตถูกวิพากษ์วิจารณ์บนสื่อ",
+   "entities": [],
+   "corrections": []
   }
  }
 }

@@ -912,33 +912,70 @@ def test_a_dead_provider_stops_being_asked(monkeypatch):
     to produce exactly the extractive result it could have produced at once.
     """
     from app.config import settings
+    from app.nlp import llm_enrich
     from app.services import segmentation
 
     monkeypatch.setattr(settings, "llm_enrich_segments", True)
     monkeypatch.setattr(settings, "llm_provider", "ollama")
 
-    attempts: list[int] = []
+    calls: list[str] = []
 
-    def always_fails(segment, *, cache=None, allow_model=True):
-        attempts.append(segment.index)
-        return "unavailable"
+    def unreachable(prompt, *, timeout):
+        calls.append(prompt)
+        raise llm_enrich.LLMUnavailable("connection refused")
 
-    monkeypatch.setattr(segmentation, "_enrich_with_llm", always_fails)
+    monkeypatch.setattr(llm_enrich, "_complete", unreachable)
 
     segments = [
         Segment(
             index=index,
             start_ms=index * 60_000,
             end_ms=(index + 1) * 60_000,
-            text="ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก",
+            text=f"ข่าวเรื่องที่ {index} ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลาง",
         )
         for index in range(10)
     ]
     segmentation.analyse_segments(segments)
 
-    assert len(attempts) == segmentation.LLM_FAILURE_LIMIT
+    assert len(calls) == segmentation.LLM_FAILURE_LIMIT
     # Every story still got its extractive analysis.
     assert all(segment.headline for segment in segments)
+    assert all(segment.enriched_by == "" for segment in segments)
+
+
+def test_a_tripped_breaker_still_reads_the_cache(monkeypatch):
+    """The headlines already written are on disk and have nothing to do with the
+    provider being down. Disabling enrichment outright would throw them away."""
+    from app.config import settings
+    from app.nlp import llm_enrich
+    from app.services import segmentation
+    from app.services.enrichment_cache import EnrichmentCache
+
+    monkeypatch.setattr(settings, "llm_enrich_segments", True)
+    monkeypatch.setattr(settings, "llm_provider", "ollama")
+
+    calls: list[str] = []
+
+    def unreachable(prompt, *, timeout):
+        calls.append(prompt)
+        raise llm_enrich.LLMUnavailable("connection refused")
+
+    monkeypatch.setattr(llm_enrich, "_complete", unreachable)
+
+    texts = [
+        f"ข่าวเรื่องที่ {index} ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลาง"
+        for index in range(8)
+    ]
+    cache = EnrichmentCache("video")
+    # The last story was written on an earlier run, before the provider died.
+    cache.put(texts[-1], headline="พาดหัวจากแคช", entities=[], corrections=[])
+
+    segments = [_segment(text, index=index) for index, text in enumerate(texts)]
+    segmentation.analyse_segments(segments, cache=cache)
+
+    assert len(calls) == segmentation.LLM_FAILURE_LIMIT
+    assert segments[-1].headline == "พาดหัวจากแคช"
+    assert segments[-1].enriched_by == "llm"
 
 
 def test_a_recovering_provider_keeps_being_asked(monkeypatch):
@@ -1354,3 +1391,57 @@ def test_only_the_first_line_of_a_completion_is_the_headline():
     assert _clean_headline(completion) == "ตำรวจจับผู้ต้องหาคดียาเสพติด"
     # Leading blank lines are skipped rather than read as an empty headline.
     assert _clean_headline(NEWLINE + "  " + NEWLINE + "น้ำท่วมภาคเหนือ") == "น้ำท่วมภาคเหนือ"
+
+
+def test_a_cached_headline_does_not_freeze_the_entities(monkeypatch):
+    """The entities come from the rule-based extractor on every run. A cache
+    entry that carried them would mean a later improvement to entity extraction
+    silently never reached a cached story."""
+    from app.nlp import llm_enrich
+    from app.services.enrichment_cache import EnrichmentCache
+    from app.services.segmentation import _enrich_with_llm
+
+    text = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
+    cache = EnrichmentCache("video")
+    cache.put(text, headline="จับกุมคดียาเสพติด", entities=[], corrections=[])
+
+    monkeypatch.setattr(
+        llm_enrich,
+        "_complete",
+        lambda prompt, *, timeout: (_ for _ in ()).throw(
+            AssertionError("model called on a cache hit")
+        ),
+    )
+    segment = _segment(text)
+    fresh = [{"text": "ตำรวจ", "label": "ORGANIZATION"}]
+    segment.entities = fresh
+
+    assert _enrich_with_llm(segment, cache=cache) == "cache"
+    assert segment.headline == "จับกุมคดียาเสพติด"
+    assert segment.entities == fresh
+
+
+def test_the_reported_totals_add_up_to_the_stories(monkeypatch):
+    """A report that does not add up undermines every other number in it. A
+    rejected cache entry is a write, not a reuse -- counting the read as both
+    made a 36-story programme report "1 written, 36 reused"."""
+    from app.nlp import llm_enrich
+    from app.services.enrichment_cache import EnrichmentCache
+    from app.services.segmentation import _enrich_with_llm
+
+    good = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
+    stale = "ฝนตกหนักต่อเนื่องทำให้เกิดน้ำท่วมในหลายจังหวัดภาคเหนือ"
+    cache = EnrichmentCache("video")
+    cache.put(good, headline="จับกุมคดียาเสพติด", entities=[], corrections=[])
+    cache.put(stale, headline="พาดหัว:", entities=[], corrections=[])
+    cache.writes = 0  # the setup is not part of what we are counting
+
+    monkeypatch.setattr(
+        llm_enrich, "_complete", lambda prompt, *, timeout: "น้ำท่วมภาคเหนือ"
+    )
+    assert _enrich_with_llm(_segment(good), cache=cache) == "cache"
+    assert _enrich_with_llm(_segment(stale, index=1), cache=cache) == "model"
+
+    assert cache.hits == 1
+    assert cache.writes == 1
+    assert cache.hits + cache.writes == 2

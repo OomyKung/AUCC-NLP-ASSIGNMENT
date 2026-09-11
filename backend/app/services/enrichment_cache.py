@@ -30,6 +30,16 @@ of model time to regenerate 112 headlines, for a change that is usually cosmetic
 headlines too, so the common wording failures are fixed without re-running
 anything.
 
+What goes in it
+---------------
+Only what the *model* returned. In the default headline-only mode that is the
+headline and nothing else -- the entities on a segment come from the rule-based
+extractor on every run, and caching those would freeze them: a later improvement
+to :mod:`app.nlp.entities` would silently never reach a cached story. (This is
+not hypothetical. The first programme's cache was seeded from the database,
+which carried 327 extractor entities along with the headlines, and they had to
+be cleared.)
+
 Nothing is cached unless a caller passes a cache in, which keeps tests that run
 the pipeline from writing into committed data.
 """
@@ -73,8 +83,11 @@ class EnrichmentCache:
     ) -> None:
         self.video_id = video_id
         self.entries: dict[str, dict] = entries or {}
+        # Entries actually *used*, counted by the caller rather than by the
+        # lookup: an entry can be read and then rejected (a headline that cleans
+        # down to nothing), and counting the read would make the reported totals
+        # exceed the number of stories.
         self.hits = 0
-        self.misses = 0
         # Headlines written into this cache during the run, which is exactly the
         # number the model was asked for -- reported instead of inferred by
         # subtraction, which could not tell a stale entry from a fresh call.
@@ -100,12 +113,16 @@ class EnrichmentCache:
 
     # ----------------------------------------------------------------- reads
     def get(self, text: str) -> dict | None:
+        """The stored entry for one story, or None. Counts nothing -- see
+        :meth:`note_used`."""
         entry = self.entries.get(self.key(text))
         if not isinstance(entry, dict) or entry.get("schema") != SCHEMA:
-            self.misses += 1
             return None
-        self.hits += 1
         return entry
+
+    def note_used(self) -> None:
+        """Record that an entry from :meth:`get` was accepted and applied."""
+        self.hits += 1
 
     # ---------------------------------------------------------------- writes
     def put(self, text: str, *, headline: str, entities: list, corrections: list) -> None:

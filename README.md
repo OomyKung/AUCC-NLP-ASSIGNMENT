@@ -366,10 +366,12 @@ beside every correction so a reader can check rather than trust it.
 
 With no provider reachable the pipeline behaves exactly as before, so nothing
 here is load-bearing for a fresh clone or an offline demo. A provider that is not
-answering is asked three times and then dropped for the rest of the programme:
-the enrichment timeout is 120 seconds, so without that a 76-story run against a
-stopped Ollama would sit for two and a half hours to produce the extractive
-result it could have produced immediately.
+answering is asked three times and then stops being *called* for the rest of the
+programme: the enrichment timeout is 120 seconds, so without that a 76-story run
+against a stopped Ollama would sit for two and a half hours to produce the
+extractive result it could have produced immediately. It keeps reading the cache
+either way — headlines already written are on disk and have nothing to do with
+the provider being down.
 
 #### The headlines are committed, not re-generated
 
@@ -440,18 +442,23 @@ stream looking for one story.
   objective proxy (adjacent segments sharing most keywords = probably one story
   split in two). The signal counts and the boundary reasons are reported so a
   reader can judge; no segmentation F1 is claimed, because none was measured.
-- **A 7B model writes good headlines and needs watching.** 109 of the 112 stored
-  stories got a written headline; 3 fell back to the extractive one. Median
-  length 48 characters. Four failure modes showed up in the first run and each
-  needed a rule, because instructing the model reduced them but did not stop
-  them: it labelled its own answer (`พาดหัว: …`, 2 of the first 36), restated the
-  question instead of answering it (`ข้อความนี้พูดถึงเรื่อง…`), drifted into
-  Chinese (one story came back entirely as `政坛对峙：反击与回应`, and a short prompt
-  produced Thai that switched script mid-sentence), and explained its own
-  headline in a second paragraph. All four are now stripped or rejected — and
-  rejection falls back to the extractive headline, which is why 3 stories have
-  one. After the rules, all 109 pass an audit for self-labels, wrong script,
-  keyword dumps and empties.
+- **A 7B model writes good headlines and needs watching.** 111 of the 112 stored
+  stories got a written headline, median length 48 characters; 1 falls back to the
+  extractive one. Four failure modes showed up and each needed a rule, because
+  instructing the model reduced them but never stopped them:
+
+  | Failure | Seen | Rule |
+  |---|---|---|
+  | Labels its own answer | `พาดหัว: โค้ชวอลเลย์บอล…`, 2 of the first 36 | strip an explicit `label:` prefix |
+  | Restates the question | `ข้อความนี้พูดถึงเรื่องการลุยธุรกิจโรงแรม…` | strip the preamble, keep the rest |
+  | Explains itself afterwards | a second paragraph justifying the headline | first non-empty line only |
+  | Drifts out of Thai script | `政坛对峙：反击与回应`; `โจรจี้银行抢劫案嫌疑人被捕`; `แก๊งคอซентเตอร์` — Cyrillic inside a Thai word | reject: CJK, Hangul or Cyrillic present, or no Thai at all |
+
+  Rejection falls back to the extractive headline, which is where the one
+  remaining fallback comes from — that story produced a Cyrillic-infected word
+  twice. The others cleared on a retry, since sampling is not deterministic.
+  After the rules all 111 pass an audit for self-labels, wrong script, keyword
+  dumps and empties.
 - **The programme's own ident becomes a story.** The longest headlines are
   faithful summaries of the presenters introducing themselves — 120 characters of
   names and airtimes. The model is not wrong; the segment really is a station

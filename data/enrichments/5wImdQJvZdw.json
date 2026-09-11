@@ -4,1561 +4,217 @@
   "6fa37821db3c75fc5a8d:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "ประชุมบอร์ดData Center และปัญหาในสภา",
-   "entities": [
-    {
-     "text": "นพ.ธศักราช",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเอกนิติ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณพัทรพงษ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณณัฐพงษ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณรักชนก",
-     "label": "PERSON"
-    },
-    {
-     "text": "คณะกรรมการเรื่อง",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาเมื่อวาน",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาเดี๋ยว",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "จังหวัดชายแดน",
-     "label": "LOCATION"
-    },
-    {
-     "text": "กรุงเทพมหานคร",
-     "label": "LOCATION"
-    },
-    {
-     "text": "4กันยายน",
-     "label": "DATE"
-    },
-    {
-     "text": "14 กันยายน",
-     "label": "DATE"
-    },
-    {
-     "text": "6:00 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "20:00 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "2 นาที",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "220ba2db2a7fb031b9aa:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "เหตุรถชนหึงโหดอดีตแฟนสาวเสียชีวิต",
-   "entities": [
-    {
-     "text": "นางสาวนฤษ",
-     "label": "PERSON"
-    },
-    {
-     "text": "นายเจตพล",
-     "label": "PERSON"
-    },
-    {
-     "text": "นายทรงพล",
-     "label": "PERSON"
-    },
-    {
-     "text": "นางสาวน",
-     "label": "PERSON"
-    },
-    {
-     "text": "กรมยุทธ",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "มูลนิธิแห่ง",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาพ",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "โรงพยาบาลเกษม",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "โรงพยาบาลพระ",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "แขวงวง",
-     "label": "LOCATION"
-    },
-    {
-     "text": "เขตบาง",
-     "label": "LOCATION"
-    },
-    {
-     "text": "ซอยวัด",
-     "label": "LOCATION"
-    },
-    {
-     "text": "ถนนกรุงเทพ",
-     "label": "LOCATION"
-    },
-    {
-     "text": "นนทบุรี",
-     "label": "LOCATION"
-    },
-    {
-     "text": "3 กันยายน",
-     "label": "DATE"
-    },
-    {
-     "text": "2 ราย",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "23ปี",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "28 ปี",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "2 คัน",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "1 ปี",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "2 คน",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "dda69affed99b9df5ecd:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "เหตุสลดหญิงถูกฆ่าหลังถูกขู่ข่มขู่จากอดีตแฟน",
-   "entities": [
-    {
-     "text": "นายเจตพล",
-     "label": "PERSON"
-    },
-    {
-     "text": "นายทรงพล",
-     "label": "PERSON"
-    },
-    {
-     "text": "ซอยกรุง",
-     "label": "LOCATION"
-    },
-    {
-     "text": "ซอยหลาย",
-     "label": "LOCATION"
-    },
-    {
-     "text": "สมุทรปราการ",
-     "label": "LOCATION"
-    },
-    {
-     "text": "31 สิงหาคม",
-     "label": "DATE"
-    },
-    {
-     "text": "22:00 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "3หลัง",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "2 คน",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "1ปี",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "3 วัน",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "23 ปี",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "14daa9a6a40a3fd57e52:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "เหตุระเบิดในโรงงานนิคมบางเพรียงทำคนเจ็บ 3 ราย",
-   "entities": [
-    {
-     "text": "สภาพ",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สมุทรปราการ",
-     "label": "LOCATION"
-    },
-    {
-     "text": "16:00 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "6:19 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "3 ราย",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "3 คน",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "2 คน",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "529d0dd87ae7a1f3e969:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "วิธีจัดการความร้อนในบ้านเพื่อประหยัดพลังงาน",
-   "entities": [
-    {
-     "text": "คุณรุ่งได้ดี",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณอยากรู้",
-     "label": "PERSON"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "d236b8ffed287e777e15:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "นักวอลเลย์บอลหญิงคว้าตั๋วโอลิมปิก LA2028",
-   "entities": [
-    {
-     "text": "นายกรัฐมนตรีอนุทินชา",
-     "label": "PERSON"
-    },
-    {
-     "text": "สมาคมกีฬา",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "6:23",
-     "label": "TIME"
-    },
-    {
-     "text": "23 นาที",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "d9d9cda4821802d1580e:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "วอลเลย์บอลหญิงทีมชาติทำให้คนไทยยินดีต้อนรับสู่โอลิมปิก",
-   "entities": [
-    {
-     "text": "สงขลา",
-     "label": "LOCATION"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "6bd56c7a32411935ba62:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "มอบรางวัลกีฬาใหม่ 14 ล้านบาทให้นักกีฬาไทย",
-   "entities": [
-    {
-     "text": "คุณอนุทิน",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณทีน",
-     "label": "PERSON"
-    },
-    {
-     "text": "นายFacebookFacebookแทก",
-     "label": "PERSON"
-    },
-    {
-     "text": "สมาคมรวมถึง",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สมาคมกีฬา",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "700,000บาท",
-     "label": "MONEY"
-    },
-    {
-     "text": "20 ปี",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "2 ปี",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "558d1ea6fbea537b0b13:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "พาดหัว: โค้ชวอลเลย์บอลรุ่นเก่าถวายสิ่งศักดิ์สิทธิ์คว้าแชมป์",
-   "entities": [
-    {
-     "text": "คุณพิษโพ",
-     "label": "PERSON"
-    },
-    {
-     "text": "10 ล้านบาท",
-     "label": "MONEY"
-    },
-    {
-     "text": "20 ปี",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "3e939c9849c29d3cde28:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "กำลังใจนักกีฬาไทยก่อนแข่งเอเชียนเกม 2023",
-   "entities": [
-    {
-     "text": "คุณสมพร",
-     "label": "PERSON"
-    },
-    {
-     "text": "สมาคมกีฬา",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "13กันยายน",
-     "label": "DATE"
-    },
-    {
-     "text": "22 กันยายน",
-     "label": "DATE"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "e943f9c6d6d94b8c3b63:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "พาดหัว: บรรยากาศการเมืองเปลี่ยนแปลงดีใจภาคภูมิใจไม่โดนด่า",
-   "entities": [
-    {
-     "text": "6:42 น.",
-     "label": "TIME"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "17c0a60a465aea29ebc7:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "วิธีจัดการความร้อนในบ้านเพื่อประหยัดพลังงาน",
-   "entities": [
-    {
-     "text": "คุณรุ่งได้ดี",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณอยากรู้",
-     "label": "PERSON"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "975740e1a1dcdc42c4de:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "สภาเดือดเรื่องกระทู้สดชายแดนใต้และรายงานกกต.",
-   "entities": [
-    {
-     "text": "คุณอ่า",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณแบงค์",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณสุพร",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณสากริ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณแสวงบุญ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณศักริ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณพณิตวัชร",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณซากิ",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีหลายคน",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณพฤธ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณอภิสิทธิ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเลิศักดิ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณพิ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณปกร",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณโสภล",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภาเดือด",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภารอบ",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาแห่ง",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "จังหวัดชายแดน",
-     "label": "LOCATION"
-    },
-    {
-     "text": "จังหวัดน่าน",
-     "label": "LOCATION"
-    },
-    {
-     "text": "กรุงเทพมหานคร",
-     "label": "LOCATION"
-    },
-    {
-     "text": "น่าน",
-     "label": "LOCATION"
-    },
-    {
-     "text": "บุรีรัมย์",
-     "label": "LOCATION"
-    },
-    {
-     "text": "6:47 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "19:00 น.",
-     "label": "TIME"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "a7f1ea2131066546a70e:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "ปัญหาชายแดนใต้ในสภาผู้แทนราษฎร",
-   "entities": [
-    {
-     "text": "คุณรัชนก",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณรักชน",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณรักชนก",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเลือดศักดิ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณนันทนา",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีชัยชนก",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเจเส",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีช่วยมหาดไทย",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณวรสิทธิ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเลิศประธาน",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีรักตัว",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณลักษน",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภาผู้แทนราษฎร",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาผู้แทน",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "จังหวัดแช",
-     "label": "LOCATION"
-    },
-    {
-     "text": "จังหวัดชายแดน",
-     "label": "LOCATION"
-    },
-    {
-     "text": "จังหวัดนี่แหละ",
-     "label": "LOCATION"
-    },
-    {
-     "text": "สงขลา",
-     "label": "LOCATION"
-    },
-    {
-     "text": "3คน",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "98021b82d4698af26732:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "ประท้วงรัฐบาลไม่ลงพื้นที่3จังหวัดชายแดนภาคใต้",
-   "entities": [
-    {
-     "text": "รัฐมนตรีทั้ง",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีวรสิท์",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีรักตัว",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีช่วยมหาดไทย",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภาเพื่อน",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาแห่ง",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาคุณ",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "จังหวัดชายแดน",
-     "label": "LOCATION"
-    },
-    {
-     "text": "จังหวัดชีวิต",
-     "label": "LOCATION"
-    },
-    {
-     "text": "จังหวัดเชน",
-     "label": "LOCATION"
-    },
-    {
-     "text": "สงขลา",
-     "label": "LOCATION"
-    },
-    {
-     "text": "สตูล",
-     "label": "LOCATION"
-    },
-    {
-     "text": "ปัตตานี",
-     "label": "LOCATION"
-    },
-    {
-     "text": "2:00 น.",
-     "label": "TIME"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "84db3fa600019e9e371c:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "การประชุมครม.สัญจรไม่ให้ความสำคัญชายแดนใต้",
-   "entities": [
-    {
-     "text": "คุณณัฐพงษ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภาหัวหน้า",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาสรุป",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาแห่ง",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "จังหวัดชายแดน",
-     "label": "LOCATION"
-    },
-    {
-     "text": "สตูล",
-     "label": "LOCATION"
-    },
-    {
-     "text": "18:00 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "21:00 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "3 ชั่วโมง",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "08122b1683ad0410cd9e:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "การประชุมสภาฯ ปัญหาการทำหน้าที่กกต. และการเสนอติ",
-   "entities": [
-    {
-     "text": "คุณมัลิกา",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณชาก",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเทงเสนอ",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภานอกจาก",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาปิดปาก",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาผู้แทนราษฎร",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภามีค่า",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "จังหวัดชายแดน",
-     "label": "LOCATION"
-    },
-    {
-     "text": "จังหวัดนั้น",
-     "label": "LOCATION"
-    },
-    {
-     "text": "21:00 น.",
-     "label": "TIME"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "1c43d7856bccb7967518:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "พักการประชุมเพื่อโฆษณาสินค้าลดกรดไหลย้อน",
-   "entities": [
-    {
-     "text": "20 นาที",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "34135843c124c674de3d:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "วิธีจัดการความร้อนในบ้านและการท่องเที่ยวสวนนงรนุชพัทยา",
-   "entities": [
-    {
-     "text": "คุณรุ่งได้ดี",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณอยากรู้",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณพัคมนหนุน",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณรักชนก",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณสาธิตวงษ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณพระพิทักษ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภากลายเป็น",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "7:12 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "60 ปี",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "80 ปี",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "1,700 ไร่",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "0e7526ab87669281a8a2:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "เล่นการเมืองด้วยความเดือดร้อนประชาชนภาคใต้",
-   "entities": [
-    {
-     "text": "คุณสาธิ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณสาธิต",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภาแห่ง",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "จังหวัดชายแดน",
-     "label": "LOCATION"
-    },
-    {
-     "text": "13:30 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "13:30น.",
-     "label": "TIME"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "19bc18926bb5d04464c4:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "การเตรียมการปิดปากสภาเรื่องฮั้วสว.",
-   "entities": [
-    {
-     "text": "สภาไม่",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "จังหวัดชายแดน",
-     "label": "LOCATION"
-    },
-    {
-     "text": "13:30 น.",
-     "label": "TIME"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "f575103c635ebaffae41:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "การประชุมสภาฯ ต่อเนื่องถึงค่ำ เนื่องจากยังไม่ผ่านการพิจารณารายงานกกต.",
-   "entities": [
-    {
-     "text": "คุณสาธิต",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณขอบคุณ",
-     "label": "PERSON"
-    },
-    {
-     "text": "20:00 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "20:22น.",
-     "label": "TIME"
-    },
-    {
-     "text": "10วัน",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "2 คน",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "db80c453a9e0a5a09a63:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "วิธีจัดการความร้อนในบ้านเพื่อประหยัดพลังงาน",
-   "entities": [
-    {
-     "text": "คุณรุ่งได้ดี",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณอยากรู้",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณแสวงบุญ",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภาหลังจาก",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "7:25น.",
-     "label": "TIME"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "744164a4fd82fcca0b32:ollama:qwen2.5:7b": {
    "schema": 1,
-   "headline": "ประชุมสภาฯตีความยติชายแดนใต้แตกต่าง意见",
-   "entities": [
-    {
-     "text": "คุณสาธิต",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณณัฐพงษ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณอภิสิทธิ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "นายตรี",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณกรวี",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีกาลม",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณมัลิกา",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณกรี",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณวิสิต",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณอเมริกา",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณรัฐวงศ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภาแห่ง",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "จังหวัดชายแดน",
-     "label": "LOCATION"
-    },
-    {
-     "text": "อ่างทอง",
-     "label": "LOCATION"
-    }
-   ],
+   "headline": "ที่ประชุมสภาฯตัดสินใจลงมติเรียกร้องนายกฯตอบยติชายแดนใต้",
+   "entities": [],
    "corrections": []
   },
   "85ad37bf9697bef38ef4:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "ประชุมสภาเกิดดราม่า ประธานถูกวิพากษ์วิจารณ์",
-   "entities": [
-    {
-     "text": "คุณมลิ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณณัฐพงษ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณรังสิมัน",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเท้ง",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณโรมสวน",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณมัลิกา",
-     "label": "PERSON"
-    },
-    {
-     "text": "นายธนยศ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณรังสีมัน",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณไม่ขอโทษ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณหมิ่นประมาท",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภาขอให้",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาแห่ง",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาเรา",
-     "label": "ORGANIZATION"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "47ede57d137eb4c4c05d:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "การอภิปรายยุติชายแดนใต้",
-   "entities": [
-    {
-     "text": "คุณอภิสิทธิ์",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณปกร",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณแสวง",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณรังสิมัน",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณโสภล",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณโลม",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณโสภลบ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณกรวี",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเห็น",
-     "label": "PERSON"
-    },
-    {
-     "text": "นราธิวาส",
-     "label": "LOCATION"
-    },
-    {
-     "text": "20:00 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "23:00 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "27 คน",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "5 คน",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "42bb3d7d02fc7cc96b27:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "ประชุมสภาฯ เกิดเหตุการณ์ดุเดือด ทั้งฝ่ายรัฐบาล-ฝ่ายค้านประท้วง",
-   "entities": [
-    {
-     "text": "คุณศุภชัย",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณโสภล",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณพูดแบบนี้",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภาขณะนี้",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาไม่",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาท่าน",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "23:00 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "19:00 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "300นาที",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "2 คน",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "300 นาที",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "aabf44acd2bf9e7d3ff5:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "รัฐบาลปิดประชุมเร็วถูกวิจารณ์",
-   "entities": [
-    {
-     "text": "คุณเท้ง",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณรัชดก",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเทง",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณยิ่งชีพ",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภาอะไร",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาเค้า",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สภาเดือด",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "7:46 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "0%",
-     "label": "PERCENT"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "4def83a40f3ec296f7df:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "วิธีจัดการความร้อนในบ้านเพื่อประหยัดพลังงาน",
-   "entities": [
-    {
-     "text": "คุณรุ่งได้ดี",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณอยากรู้",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีเอกนิติ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณแบงค์สุ",
-     "label": "PERSON"
-    },
-    {
-     "text": "7:50 น.",
-     "label": "TIME"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "ec47c5d1df4190f1e148:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "ปัญหา Data Center ที่กรุงเทพฯ กระทบสิ่งแวดล้อมและชุมชน",
-   "entities": [
-    {
-     "text": "คุณเอกนิติ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณจตุรงค์อัส",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณจันตุรงค์",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณจตุรงค์",
-     "label": "PERSON"
-    },
-    {
-     "text": "ดร.สุรินทร์วร",
-     "label": "PERSON"
-    },
-    {
-     "text": "กรมควบคุม",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "กระทรวงทรัพย์",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "โรงพยาบาลพระราม",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "กรมเพื่อ",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "บริษัทน่าจะ",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "กรมธุรกิจ",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "กระทรวงพลังงาน",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "สุรินทร์",
-     "label": "LOCATION"
-    },
-    {
-     "text": "10:30 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "7 วัน",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "7วัน",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "a3571b239e17b9a424c2:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "ข่าวเพลงและรายการทีวีของครอบครัวข่าวสาร",
-   "entities": [
-    {
-     "text": "คุณรุ่งได้ดี",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณอยากรู้",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณนคือ",
-     "label": "PERSON"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "0eb4cd4466d540506809:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "การจัดระเบียบ Data Center ตามมติครม.18:4",
-   "entities": [
-    {
-     "text": "นายเขากุ่ย",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณสุพนัส",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณชุมพนัส",
-     "label": "PERSON"
-    },
-    {
-     "text": "นายกรัฐมนตรีตั้งแต่สมัย",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีว่าการกระทรวงมหาดไทย",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเอกนัส",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีว่าการพลังงาน",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเด็กรัตน",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเอกนิติ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณวีรยุทธการ",
-     "label": "PERSON"
-    },
-    {
-     "text": "สภานี้",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "กระทรวงมหาดไทย",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "คณะกรรมการData",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "กระทรวงพลังงาน",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "กรมธุรกิจ",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "กรุงเทพมหานคร",
-     "label": "LOCATION"
-    },
-    {
-     "text": "5 สิงหาคม",
-     "label": "DATE"
-    },
-    {
-     "text": "2 ปี",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "f950c4bef323627e1d07:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "รัฐบาลจี้ย้อนหลังบังคับใช้โครงการ57DataCenter",
-   "entities": [
-    {
-     "text": "คุณวียร",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเอกนัส",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณชัยชนก",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณสุภนัต",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณพลรพี",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีช่วยมหาดไทย",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณสุพนัส",
-     "label": "PERSON"
-    },
-    {
-     "text": "คณะกรรมการนี้",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "5 สิงหาคม",
-     "label": "DATE"
-    },
-    {
-     "text": "4 กันยายน",
-     "label": "DATE"
-    },
-    {
-     "text": "23 ตุลาคม",
-     "label": "DATE"
-    },
-    {
-     "text": "7:00 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "8:15 น.",
-     "label": "TIME"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "4541e1b82ff54b2bc78f:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "ฝนหนักต่อเนื่องสัปดาห์นี้ เผยประเด็น Active User TAI พาปอร์ต",
-   "entities": [
-    {
-     "text": "คุณชัยชนก",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีดีพูดถึง",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณชัยชุ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณรักชนก",
-     "label": "PERSON"
-    },
-    {
-     "text": "รัฐมนตรีดีอ",
-     "label": "PERSON"
-    },
-    {
-     "text": "กรมบุ",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "7กันยายน",
-     "label": "DATE"
-    },
-    {
-     "text": "7 กันยายน",
-     "label": "DATE"
-    },
-    {
-     "text": "8:19 น.",
-     "label": "TIME"
-    },
-    {
-     "text": "9:10",
-     "label": "TIME"
-    },
-    {
-     "text": "3 วัน",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "f8a2bb4d655d69f73bd9:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "การเปรียบเทียบประสิทธิภาพ AI ฟรีกับ AI Pro ในแพลตฟอร์ม",
-   "entities": [
-    {
-     "text": "คุณชอบคำ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณมากกว่าพอ",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณเลือกโมเดล",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณชัยชนก",
-     "label": "PERSON"
-    },
-    {
-     "text": "3 ปี",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   },
   "532b78966a17ee8433d0:ollama:qwen2.5:7b": {
    "schema": 1,
    "headline": "นายกเมืองนิวยอร์กประกาศห้ามใช้AIในโรงเรียนชั้นต่ำถึงมัธยมต้น",
-   "entities": [
-    {
-     "text": "คุณญญา",
-     "label": "PERSON"
-    },
-    {
-     "text": "คุณศิริ",
-     "label": "PERSON"
-    },
-    {
-     "text": "โรงเรียนรัฐบาล",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "กระทรวงดิ",
-     "label": "ORGANIZATION"
-    },
-    {
-     "text": "1 ปี",
-     "label": "QUANTITY"
-    },
-    {
-     "text": "16 ปี",
-     "label": "QUANTITY"
-    }
-   ],
+   "entities": [],
    "corrections": []
   }
  }

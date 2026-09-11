@@ -904,9 +904,11 @@ def analyse_segments(
             if status == "unavailable":
                 consecutive_failures += 1
                 if consecutive_failures >= LLM_FAILURE_LIMIT:
-                    # Not reachable, or not answering usefully. Finish the
-                    # programme extractively instead of timing out per story.
-                    use_llm = False
+                    # Stop *calling* it, but keep reading the cache: the
+                    # headlines already written for this video are on disk and
+                    # have nothing to do with the provider being down. Disabling
+                    # enrichment outright here would throw them away.
+                    allow_model = False
             else:
                 # A hit, a write, or a deliberate skip -- none of them evidence
                 # that the provider is down.
@@ -996,6 +998,8 @@ def _enrich_with_llm(
         # marking the story as enriched with an empty headline.
         if candidate.usable:
             enrichment = candidate
+            if cache is not None:
+                cache.note_used()
 
     if enrichment is None:
         if not allow_model:
