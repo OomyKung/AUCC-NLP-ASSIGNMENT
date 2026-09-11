@@ -54,18 +54,21 @@ class Settings(BaseSettings):
     # ----------------------------------------------------- NLP backend wiring
     # Swapping any model = change one value here (see app/nlp/registry.py).
     nlp_tokenizer: Literal["newmm", "newmm-safe", "longest", "mm"] = "newmm"
-    # Topic blends the trained model with the gazetteer: cross-validated
-    # macro-F1 0.720 -> 0.740, held-out 0.725 -> 0.763. The two make
-    # different mistakes, so averaging them wins.
+    # Both tasks blend the trained model with their rule-based baseline, because
+    # the two make different mistakes. Weights are fitted by ensemble.py on
+    # out-of-fold training predictions; see Results in the README.
+    #   topic     : CV macro-F1 0.764 -> 0.780
+    #   sentiment : CV macro-F1 0.716 -> 0.725
+    #
+    # Sentiment's weight fitted to exactly 1.0 on the smaller 747-row dataset,
+    # meaning the lexicon added nothing and the blend was pure overhead. With
+    # more data and a calibrated LinearSVC base it now fits to 0.85, so the
+    # lexicon is contributing again. The value is measured each time rather
+    # than assumed, which is why it is a config entry and not a constant.
     nlp_topic_backend: Literal["sklearn", "blend", "transformer"] = "blend"
-    # Sentiment does NOT blend. The same fitting procedure chose alpha = 1.00
-    # for it -- once the model had properly tuned hyperparameters, the lexicon
-    # contributed nothing (CV 0.7081 alone vs 0.7084 blended, identical
-    # held-out). "blend" is still available, but defaulting to it would add a
-    # component that the measurement says does no work.
     nlp_sentiment_backend: Literal[
         "sklearn", "blend", "lexicon", "transformer"
-    ] = "sklearn"
+    ] = "blend"
     # Per-message chat sentiment uses a SEPARATE backend from news sentiment,
     # because the domain gap between news prose and live-chat register is large
     # and was measured in both directions:
@@ -90,11 +93,9 @@ class Settings(BaseSettings):
     # Blend weights: P = alpha * P_model + (1 - alpha) * P_rules. Fitted by
     # ensemble.py on out-of-fold training predictions -- never on the held-out
     # set. alpha=1.0 is the trained model alone, 0.0 the rule baseline alone.
-    # Both values below are what that search selected.
-    nlp_topic_blend_alpha: float = 0.85
-    # 1.0 is not a placeholder: it is the fitted result, and the reason
-    # nlp_sentiment_backend defaults to "sklearn" rather than "blend".
-    nlp_sentiment_blend_alpha: float = 1.0
+    # Re-fit these with `python ensemble.py` after retraining.
+    nlp_topic_blend_alpha: float = 0.90
+    nlp_sentiment_blend_alpha: float = 0.85
     nlp_ner_backend: Literal["rules", "pythainlp"] = "rules"
 
     # Optional Hugging Face models (only loaded when a transformer backend is on).

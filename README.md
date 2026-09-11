@@ -198,35 +198,53 @@ output for any document you select — not a static diagram.
 
 ## Results
 
-Topic and news sentiment are measured on a stratified held-out split of the news
-dataset (20%, seed 42) that the models never saw; `python evaluate.py` regenerates
-those. Chat sentiment is measured on a different corpus's official test split, so
-it is reported separately below rather than mixed into the same rows.
+### How every number here was chosen
 
-These are the models that actually serve requests. The Evaluation page marks the
-active one and opens on it, so the page cannot describe a model the API is not
-running.
+This matters more than any single figure, so it comes first.
 
-| Task | Serving model | Accuracy | Precision (macro) | Recall (macro) | F1 (macro) |
-|---|---|---|---|---|---|
-| **Topic** (15 classes) | blend (TF-IDF + gazetteer) | 0.767 | 0.786 | 0.767 | **0.763** |
-| **Sentiment** (3 classes) | TF-IDF + logistic regression | 0.753 | 0.724 | 0.689 | **0.698** |
-| **Chat sentiment** (3 classes) | TF-IDF trained on Wisesight | 0.710 | 0.668 | 0.678 | **0.673** |
+Model selection — hyperparameters, algorithm, blend weight, feature
+configuration — is done by **5-fold cross-validation on the training split
+only**. The held-out split is scored once, for reporting. `train.py` reports its
+CV on the same training split, so the CV figure and the hold-out figure are
+independent estimates rather than two views of overlapping rows.
 
-Random guessing would score 0.067, 0.333 and 0.333 respectively. Chat sentiment
-is measured on a different corpus — see *Chat sentiment* below.
+Three things this discipline caught, all of which would have looked like progress:
 
-### How these numbers were obtained
+- A character-only feature configuration scored **0.787 accuracy** on the
+  sentiment hold-out, the best number ever produced in this project.
+  Cross-validation ranked it *below* word+char. It was noise on 150 rows; it is
+  not used and not claimed.
+- `tune.py` pre-tokenises documents once so a 144-point grid is affordable, which
+  makes its pipeline subtly different from `build_vectorizer`. It scored the
+  shipping sentiment config at 0.723 where the real pipeline measures 0.705, so
+  its *ranking* could not be adopted on trust. Every candidate was re-scored
+  through the production pipeline, and only configurations that won there shipped.
+- Adding 12 rows to the catch-all `other` category **hurt** (CV 0.737 vs 0.752),
+  so they were removed. See *What the data expansion did* below.
 
-Every choice — hyperparameters, blend weight, feature configuration — was made by
-**5-fold cross-validation on the training split only**. The held-out set is scored
-once, for reporting. This matters more than any individual figure below, and one
-case shows why: a character-only feature configuration scores **0.787 accuracy /
-0.743 macro-F1** on the sentiment held-out set, comfortably the best number in
-this README. Cross-validation ranks it *below* word+char (0.694 vs 0.708), and the
-fold standard deviation is ±0.034. The held-out result is selection noise on 150
-rows, so it is not used and not claimed. Selecting on the test set would have
-bought a 0.787 headline and a model that was no better.
+### The models that serve requests
+
+The Evaluation page marks the active model and opens on it, so it cannot describe
+a model the API is not running.
+
+Topic and news sentiment use a stratified hold-out split of the news dataset
+(20%, seed 42, 168 rows). Chat sentiment is measured on a different corpus's
+official test split and is reported separately.
+
+| Task | Serving model | Accuracy | Precision (macro) | Recall (macro) | F1 (macro) | CV F1 (macro) |
+|---|---|---|---|---|---|---|
+| **Topic** (15 classes) | blend: logreg + gazetteer, α=0.90 | 0.702 | 0.725 | 0.704 | 0.705 | **0.780** |
+| **Sentiment** (3 classes) | blend: calibrated LinearSVC + lexicon, α=0.85 | 0.762 | 0.749 | 0.738 | **0.742** | 0.725 |
+| **Chat sentiment** (3 classes) | LinearSVC/logreg trained on Wisesight | 0.710 | 0.668 | 0.678 | **0.673** | — |
+
+Random guessing scores 0.067, 0.333 and 0.333 respectively.
+
+**The topic row deserves a caveat rather than a flourish.** Cross-validation
+prefers the blend (0.780 vs 0.764 for the model alone), but on this single
+hold-out split the model alone is marginally ahead (0.711 vs 0.705). At 168 rows
+one row is worth 0.6 accuracy points, so the two disagree inside noise. Selection
+follows CV, which has five folds behind it instead of one sample — but the
+disagreement is real and is reported rather than smoothed over.
 
 ### Trained models vs. rule-based baselines
 
@@ -234,47 +252,85 @@ Both are scored on the **same held-out rows**. This is the only fair comparison:
 the gazetteer and lexicon were hand-written for this domain, so scoring them on
 data they were designed around would flatter them.
 
-| Task | Trained (macro-F1) | Baseline (macro-F1) | Gain |
+| Task | Serving (macro-F1) | Baseline (macro-F1) | Gain |
 |---|---|---|---|
-| Topic | 0.725 (TF-IDF + logistic regression) | 0.680 (gazetteer) | **+0.045** |
-| Sentiment | 0.698 (TF-IDF + logistic regression) | 0.422 (lexicon) | **+0.276** |
-
-Two honest observations:
-
-- **The hand-written gazetteer is genuinely competitive** for topic
-  classification, and beats the trained model on `accident` and `education`,
-  whose vocabulary is unambiguous. Training bought far less here than for
-  sentiment.
-- **Training was decisive for sentiment** (+0.276), where a word-list approach
-  cannot capture context.
+| Topic | 0.705 (blend) | 0.633 (gazetteer) | **+0.072** |
+| Sentiment | 0.742 (blend) | 0.615 (lexicon) | **+0.127** |
 
 ### Blending the rule-based and trained models
 
-Because the two make *different* mistakes, averaging their probability
-distributions helps — `P = α·P_model + (1−α)·P_rules`, with α fitted on
-out-of-fold training predictions.
+The two make *different* mistakes, which is the precondition for an ensemble
+helping at all. On the held-out split:
 
-| Topic (15 classes) | CV macro-F1 | Held-out macro-F1 | Held-out accuracy |
-|---|---|---|---|
-| TF-IDF alone | 0.720 | 0.725 | 0.727 |
-| **Blend, α = 0.85** | **0.740** | **0.763** | **0.767** |
-| Stacking (LogReg meta-learner) | 0.707 | 0.684 | 0.693 |
+| | Only rules right | Only model right | Both wrong | Oracle ceiling |
+|---|---|---|---|---|
+| Topic | 18 / 168 | 32 / 168 | 31 / 168 | 0.816 accuracy |
+| Sentiment | 17 / 168 | 40 / 168 | 23 / 168 | 0.863 accuracy |
 
-On the 150 held-out topic rows, 18 are correct only under the rules, 26 only
-under the model, and 23 under neither — so the best *any* combination of these two
-could reach is **0.847 accuracy**. The blend captures a little under half of that
-available headroom.
+The *oracle ceiling* is what a perfect chooser between the two would score — the
+hard limit on any combination of this pair. Blending captures part of the gap:
+`P = α·P_model + (1−α)·P_rules`, with α fitted on out-of-fold training
+predictions (never on the hold-out, and never on in-fold predictions, where a
+fitted model looks near-perfect on its own training rows and the search would
+just return α = 1).
 
-Two negative results worth recording:
+Three negative results, kept because they are the useful part:
 
-- **Stacking is worse than the plain model.** A logistic-regression meta-learner
-  over both probability vectors has 30 parameters to fit on 597 rows, and
-  overfits (0.707 vs 0.720 CV).
-- **Sentiment does not benefit from blending at all.** The same fitting procedure
-  chose **α = 1.00** — the trained model alone. Once its hyperparameters were
-  properly tuned it had absorbed everything the lexicon contributed, so the
-  shipped sentiment backend is `sklearn`, not `blend`. A blend that adds a
-  component doing no work would be decoration.
+- **Stacking is worse than the plain model** on both tasks (topic CV 0.750 vs
+  0.764). A logistic-regression meta-learner over both probability vectors has
+  30 parameters to fit on ~670 rows, and overfits.
+- **Temperature-sharpening the gazetteer** distribution before blending moved CV
+  and hold-out in opposite directions on the smaller dataset. One parameter that
+  buys nothing measurable is one parameter too many.
+- **Sentiment's α fitted to exactly 1.00 on the 747-row dataset** — the lexicon
+  contributed nothing, so the blend was pure overhead and the default was plain
+  `sklearn`. After the dataset grew and the base model became a calibrated
+  LinearSVC, the same procedure fits 0.85. The weight is re-measured after every
+  retrain rather than assumed, which is why it is a config value.
+
+### What the data expansion did
+
+The news dataset grew from 747 to 836 rows, targeting the two weaknesses the
+metrics actually showed rather than adding rows evenly.
+
+**Neutral sentiment** was the weakest class anywhere in the project (F1 0.491)
+with 152 training rows against 345 positive, and the shortage was very uneven:
+`society` had 2 neutral rows out of 49, `health` and `environment` 4 each. The new
+rows are deliberately procedural — a schedule, a statistic, a regulation coming
+into force — because that is what neutral news actually looks like.
+
+**`business` / `economy` / `technology`** were the three weakest topics and were
+mostly being mistaken for *each other*. More rows of the same kind would not fix
+that, since the three genuinely share vocabulary (`บริษัท`, `ลงทุน`, `ตลาด`), so each
+category's new rows were written around what *distinguishes* it: macro indicators
+for `economy`, firm-level events for `business`, products and research for
+`technology`.
+
+Per-class F1, before and after:
+
+| Class | Before | After |
+|---|---|---|
+| `neutral` (sentiment) | 0.491 | **0.667** |
+| `business` | 0.500 | **0.583** |
+| `economy` | 0.609 | 0.600 |
+| `technology` | 0.571 | 0.667 |
+| `entertainment` | 0.625 | **0.909** |
+
+And by cross-validation, which is the comparable measure since adding rows
+changes the hold-out split:
+
+| | 747 rows | 836 rows |
+|---|---|---|
+| Topic CV macro-F1 | 0.720 | **0.780** |
+| Sentiment CV macro-F1 | 0.708 | **0.725** |
+
+**The catch-all category resisted this, for a structural reason.** 12 rows added
+to `other` made things worse (CV 0.737 vs 0.752 without them), so they were
+removed. `other` has no vocabulary of its own — it is defined as "none of the
+other fourteen" — so extra diverse examples increase overlap with real siblings
+instead of sharpening a boundary. On inspection several of the labels were simply
+wrong: a storm warning reads as `disaster`, a museum notice as `society`. `other`
+remains the weakest topic at F1 0.316, and adding data is not the fix.
 
 ### Chat sentiment: the domain gap, measured in both directions
 
@@ -294,7 +350,9 @@ And the mirror image — the Wisesight-trained model on the news held-out split:
 registry keeps two and routes by stage rather than sharing one.
 
 This replaced the rule-based lexicon that previously served chat, lifting macro-F1
-from **0.436 to 0.673 (+0.237)** on the same 2,614 rows.
+from **0.436 to 0.673 (+0.237)** on the same 2,614 rows — the largest single
+improvement in the project, and on the data path the dashboard is actually built
+around.
 
 ### Does a transformer help? No, not at this data size
 
@@ -363,45 +421,70 @@ vocabulary to a TikToken converter and fails with a misleading error.
 
 ### Ablations
 
-| Experiment | Configuration | Macro-F1 |
-|---|---|---|
-| **Aggregation** | whole document | **0.725** |
-| | per-sentence + majority vote | 0.675 |
-| **Features (sentiment)** | character n-grams only | **0.697** |
-| | word + character | 0.682 |
-| | word only | 0.613 |
-| **Negation protection** | negators removed | **0.625** |
-| | negators protected | 0.613 |
+Each row is a controlled change to one thing, scored on the same held-out split.
+Cross-validation on the training split is shown alongside, because two of these
+results disagree between the two and CV is the one that decides.
 
-Aggregating text before classification gains **+0.051 macro-F1**, which is the
-evidence for grouping chat messages into windows rather than classifying each
-one alone.
+| Experiment | Configuration | Held-out F1 | CV F1 |
+|---|---|---|---|
+| **Aggregation** (topic) | whole document | **0.704** | — |
+| | per-sentence + majority vote | 0.657 | — |
+| **Features** (topic) | word + character | 0.704 | **0.756** |
+| | character only | 0.668 | 0.736 |
+| | word only | *0.734* | 0.722 |
+| **Features** (sentiment) | word + character | **0.736** | — |
+| | character only | 0.735 | — |
+| | word only | 0.697 | — |
+| **Negation protection** (sentiment) | negators protected | **0.697** | **0.683** |
+| | negators removed as stopwords | 0.680 | 0.669 |
 
-Character n-grams alone beat word features by **+0.069** on sentiment. Thai is
-written without spaces, so tokenisation is itself a model that can fail; a
-character view does not depend on it being right.
+**Aggregation** gains **+0.047 macro-F1**, which is the evidence for grouping chat
+messages into windows rather than classifying each one alone.
 
-Protecting negators from stopword removal did **not** help the trained
-classifier (−0.012, within noise on 150 rows). The token-level effect is real —
-`ไม่ดี` reduces to `['ดี']` when unprotected — and it matters for the lexicon
-backend, where negation is handled explicitly. But character n-grams already
-capture `ไม่ดี` as a character sequence, so the word-level protection is
-redundant once they are present. Reported as measured rather than as assumed.
+**Features.** Note the italicised cell: word-only features beat the word+char
+default on the hold-out (0.734 vs 0.704) but lose clearly on cross-validation
+(0.722 vs 0.756). That is the second time a hold-out result on ~150 rows has
+pointed the wrong way in this project, and it is why selection is on CV. The
+default stands. Thai is written without spaces, so tokenisation is itself a model
+that can fail; the character view does not depend on it being right, and keeping
+both is what actually generalises.
+
+**Negation protection** now helps, and this reverses an earlier finding. On the
+747-row dataset, protecting negators from stopword removal made the trained model
+slightly *worse* (−0.012) and was reported as such. With 836 rows it helps on both
+the hold-out (+0.017) and CV (+0.014). The token-level effect was always real —
+`ไม่ดี` reduces to `['ดี']` when unprotected, inverting the meaning — but on the
+smaller set character n-grams already captured `ไม่ดี` as a character sequence,
+making the word-level protection redundant. Both readings were correct for the
+data they were measured on; the honest summary is that the effect is small and
+sits near the noise floor either way.
 
 Reproduce with `python ablation.py`.
 
 ### Best and worst classes
 
+Topic, per-class F1 from the serving blend:
+
 | Strong | F1 | Weak | F1 |
 |---|---|---|---|
-| sports | 1.000 | economy | 0.455 |
-| politics | 0.889 | business | 0.471 |
-| crime | 0.842 | other | 0.571 |
-| entertainment | 0.824 | technology | 0.571 |
+| entertainment | 0.909 | other | **0.316** |
+| health | 0.857 | business | 0.583 |
+| sports | 0.842 | economy | 0.600 |
+| crime | 0.824 | environment | 0.636 |
 
-`economy`, `business` and `technology` genuinely overlap in vocabulary
-(บริษัท, ตลาด, ลงทุน, ระบบ), which is where most of the confusion sits — visible
-in the confusion matrix on the Evaluation page.
+`other` is the outlier and the reason is structural, not fixable with data: it is
+the catch-all, defined as "none of the other fourteen", so it has no vocabulary of
+its own to learn. Adding examples to it measurably *hurt* — see *What the data
+expansion did*.
+
+`economy` and `business` remain the next weakest and genuinely overlap in
+vocabulary (บริษัท, ตลาด, ลงทุน). Targeted rows written around what distinguishes
+them lifted `business` from 0.500 and `technology` from 0.571, so the overlap is
+partly addressable — but the residual confusion between the two is visible in the
+confusion matrix on the Evaluation page.
+
+Sentiment, per-class F1: positive 0.837, negative 0.724, **neutral 0.667**.
+Neutral is still the weakest of the three, but it was 0.491 before the expansion.
 
 ---
 
@@ -453,7 +536,7 @@ thai-news-nlp/
 │       ├── hooks/                   data fetching, theme, debounce, toasts
 │       └── types/                   mirrors the Pydantic schemas
 ├── data/
-│   ├── news_dataset.csv             747 labelled rows (training)
+│   ├── news_dataset.csv             836 labelled rows (training)
 │   ├── sample_news.csv              50-row display seed
 │   ├── dataset_parts/               per-category sources
 │   └── chat_snapshots/              6 real streams, 25,928 messages
@@ -474,8 +557,14 @@ React Router
 
 ### Training set — `data/news_dataset.csv`
 
-747 hand-authored Thai news rows across all 15 categories (49–51 each), each
-labelled with **both** topic and sentiment.
+836 hand-authored Thai news rows across all 15 categories (49–62 each), each
+labelled with **both** topic and sentiment. Sentiment balance is 366 positive /
+267 negative / 203 neutral.
+
+It grew from 747 rows, and the additions were aimed at the specific weaknesses the
+metrics showed rather than spread evenly — see *What the data expansion did* under
+[Results](#results), including the 12 rows that had to be removed again because
+cross-validation said they hurt.
 
 ```csv
 title,content,topic,sentiment
@@ -771,20 +860,36 @@ Stated plainly rather than hidden:
 - **The news training set is authored, not sampled from real published news.**
   It is labelled consistently and validated for duplicates, but it is not a
   citable corpus, and it is the binding constraint on the topic and news-sentiment
-  figures. 747 rows over 15 categories is ~40 training examples per class.
+  figures. 836 rows over 15 categories is ~45 training examples per class. The
+  expansion from 747 rows lifted cross-validated macro-F1 (topic 0.720 → 0.780,
+  sentiment 0.708 → 0.725), which is evidence the constraint is data rather than
+  modelling — but authored data cannot substitute for a sampled corpus in a paper.
   *Chat* sentiment no longer has this problem: it is trained on the Wisesight
   corpus (CC0, ~23.5k real human-labelled Thai social-media messages) and
   reported on that corpus's official test split.
-- **Neutral is the weakest sentiment class** (F1 0.491) with only 152 training
-  examples against 345 positive. The class imbalance is compensated with
-  balanced class weights, but more neutral data is the real fix.
-- **A 144-point hyperparameter search moved topic by ~0.000 and sentiment by
-  +0.029 CV macro-F1.** When exhaustive tuning cannot move a model, the limit is
-  the data, not the configuration. The transformer result points the same way: a
-  110M-parameter pre-trained Thai model scored *worse* than TF-IDF on both tasks,
-  which is what happens when there is too little data to fine-tune on.
-- **`economy` / `business` / `technology` confuse each other** (F1 0.45–0.57).
-  Their vocabulary genuinely overlaps.
+- **Neutral is still the weakest sentiment class** (F1 0.667), though it was
+  0.491 before the dataset expansion added targeted procedural rows and took it
+  from 152 to 203 training examples. Balanced class weights compensate for the
+  remaining imbalance; more neutral data is still the real fix.
+- **`other` is the weakest topic by a wide margin** (F1 0.316) and data will not
+  fix it. It is the catch-all — "none of the other fourteen" — so it has no
+  vocabulary of its own, and adding examples measurably *hurt* (CV 0.737 vs
+  0.752). Collapsing it, or replacing it with an explicit abstain threshold,
+  would be a better design than treating it as a 15th class.
+- **Exhaustive hyperparameter search buys very little.** A 144-point grid moved
+  topic by ~0.000 on the smaller dataset and by +0.012 on the larger one. When
+  tuning cannot move a model, the limit is the data, not the configuration. The
+  transformer result points the same way: a 110M-parameter pre-trained Thai model
+  scored *worse* than TF-IDF on both tasks, which is what happens when there is
+  too little data to fine-tune on.
+- **`economy` and `business` still confuse each other** (F1 0.600 and 0.583).
+  Targeted rows written around what distinguishes them helped — `business` rose
+  from 0.500 and `technology` from 0.571 — but their vocabulary genuinely
+  overlaps and the residual confusion is visible in the confusion matrix.
+- **Reported topic hold-out is below its own cross-validation** (0.705 vs 0.780).
+  The hold-out is 168 rows, where one row is 0.6 accuracy points, so the gap is
+  mostly sample size. It is reported both ways rather than quoting whichever is
+  higher.
 - **Topic confidence is lower on chat than on news** (≈0.41 vs ≈0.73). The model
   is trained on news prose, so lower confidence on out-of-domain chat is correct
   calibration rather than a defect — the labels themselves stay sensible.

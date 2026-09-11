@@ -1,101 +1,101 @@
 {
   "topic": {
     "winner": "LogisticRegression",
-    "cv_f1_macro": 0.719718891245207,
-    "held_out_f1_macro": 0.7244634858418678,
-    "held_out_accuracy": 0.7266666666666667,
+    "cv_f1_macro": 0.7635271497042664,
+    "held_out_f1_macro": 0.7109176591731537,
+    "held_out_accuracy": 0.7083333333333334,
     "best_params": {
       "classifier__C": "4.0",
-      "classifier__class_weight": "balanced",
-      "features__char__tfidf__min_df": "3",
-      "features__char__tfidf__ngram_range": "(2, 5)",
-      "features__word__tfidf__min_df": "2"
-    },
-    "leaderboard": [
-      {
-        "model": "LogisticRegression",
-        "cv_f1_macro": 0.719718891245207,
-        "params": {
-          "classifier__C": "4.0",
-          "classifier__class_weight": "balanced",
-          "features__char__tfidf__min_df": "3",
-          "features__char__tfidf__ngram_range": "(2, 5)",
-          "features__word__tfidf__min_df": "2"
-        },
-        "search_seconds": 272.1
-      },
-      {
-        "model": "ComplementNB",
-        "cv_f1_macro": 0.7140096853038029,
-        "params": {
-          "classifier__alpha": "1.0",
-          "features__char__tfidf__min_df": "2",
-          "features__char__tfidf__ngram_range": "(2, 5)",
-          "features__word__tfidf__min_df": "2"
-        },
-        "search_seconds": 9.9
-      },
-      {
-        "model": "LinearSVC",
-        "cv_f1_macro": 0.7122043120278415,
-        "params": {
-          "classifier__C": "0.25",
-          "classifier__class_weight": "balanced",
-          "features__char__tfidf__min_df": "3",
-          "features__char__tfidf__ngram_range": "(2, 5)",
-          "features__word__tfidf__min_df": "2"
-        },
-        "search_seconds": 31.9
-      }
-    ]
-  },
-  "sentiment": {
-    "winner": "LogisticRegression",
-    "cv_f1_macro": 0.7080695788720084,
-    "held_out_f1_macro": 0.6977082639113008,
-    "held_out_accuracy": 0.7533333333333333,
-    "best_params": {
-      "classifier__C": "1.0",
-      "classifier__class_weight": "balanced",
+      "classifier__class_weight": "None",
       "features__char__tfidf__min_df": "2",
-      "features__char__tfidf__ngram_range": "(3, 5)",
+      "features__char__tfidf__ngram_range": "(2, 4)",
       "features__word__tfidf__min_df": "1"
     },
     "leaderboard": [
       {
         "model": "LogisticRegression",
-        "cv_f1_macro": 0.7080695788720084,
+        "cv_f1_macro": 0.7635271497042664,
         "params": {
-          "classifier__C": "1.0",
-          "classifier__class_weight": "balanced",
+          "classifier__C": "4.0",
+          "classifier__class_weight": "None",
           "features__char__tfidf__min_df": "2",
-          "features__char__tfidf__ngram_range": "(3, 5)",
+          "features__char__tfidf__ngram_range": "(2, 4)",
           "features__word__tfidf__min_df": "1"
         },
-        "search_seconds": 68.2
+        "search_seconds": 588.9
       },
       {
         "model": "LinearSVC",
-        "cv_f1_macro": 0.6971244497336114,
+        "cv_f1_macro": 0.7598949536426991,
         "params": {
-          "classifier__C": "0.25",
+          "classifier__C": "2.0",
+          "classifier__class_weight": "balanced",
+          "features__char__tfidf__min_df": "3",
+          "features__char__tfidf__ngram_range": "(2, 4)",
+          "features__word__tfidf__min_df": "1"
+        },
+        "search_seconds": 44.7
+      },
+      {
+        "model": "ComplementNB",
+        "cv_f1_macro": 0.742557277344732,
+        "params": {
+          "classifier__alpha": "0.3",
+          "features__char__tfidf__min_df": "3",
+          "features__char__tfidf__ngram_range": "(2, 4)",
+          "features__word__tfidf__min_df": "2"
+        },
+        "search_seconds": 13.3
+      }
+    ]
+  },
+  "sentiment": {
+    "winner": "LinearSVC",
+    "cv_f1_macro": 0.7232801226924386,
+    "held_out_f1_macro": 0.7326721648049553,
+    "held_out_accuracy": 0.75,
+    "best_params": {
+      "classifier__C": "0.5",
+      "classifier__class_weight": "balanced",
+      "features__char__tfidf__min_df": "2",
+      "features__char__tfidf__ngram_range": "(2, 4)",
+      "features__word__tfidf__min_df": "1"
+    },
+    "leaderboard": [
+      {
+        "model": "LinearSVC",
+        "cv_f1_macro": 0.7232801226924386,
+        "params": {
+          "classifier__C": "0.5",
           "classifier__class_weight": "balanced",
           "features__char__tfidf__min_df": "2",
           "features__char__tfidf__ngram_range": "(2, 4)",
           "features__word__tfidf__min_df": "1"
         },
-        "search_seconds": 26.3
+        "search_seconds": 33.6
+      },
+      {
+        "model": "LogisticRegression",
+        "cv_f1_macro": 0.7229827522097082,
+        "params": {
+          "classifier__C": "10.0",
+          "classifier__class_weight": "None",
+          "features__char__tfidf__min_df": "3",
+          "features__char__tfidf__ngram_range": "(2, 5)",
+          "features__word__tfidf__min_df": "1"
+        },
+        "search_seconds": 102.0
       },
       {
         "model": "ComplementNB",
-        "cv_f1_macro": 0.6894647325966647,
+        "cv_f1_macro": 0.6983337115596588,
         "params": {
           "classifier__alpha": "0.1",
-          "features__char__tfidf__min_df": "3",
-          "features__char__tfidf__ngram_range": "(3, 5)",
-          "features__word__tfidf__min_df": "1"
+          "features__char__tfidf__min_df": "2",
+          "features__char__tfidf__ngram_range": "(2, 4)",
+          "features__word__tfidf__min_df": "3"
         },
-        "search_seconds": 11.3
+        "search_seconds": 11.6
       }
     ]
   }

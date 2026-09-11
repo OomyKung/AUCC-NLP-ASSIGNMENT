@@ -1,14 +1,15 @@
 """Hybrid rule + statistical models, evaluated honestly.
 
-Motivation from the measured results: on topic, the hand-written gazetteer
-(macro-F1 0.680) is close behind TF-IDF + logistic regression (0.725) *and gets
-different rows right* -- it is strongest exactly where the trained model is
-weakest (``accident``, ``education``), because those categories have unambiguous
-vocabulary. Two models with complementary errors are the textbook case for an
-ensemble.
+Motivation from the measured results: on topic the hand-written gazetteer is not
+far behind the trained model *and gets different rows right* -- it is strongest
+exactly where the trained model is weakest, on categories with unambiguous
+vocabulary like ``accident`` and ``education``. Two models with complementary
+errors are the textbook case for an ensemble, and the complementarity is
+quantified below (an "oracle ceiling": the accuracy a perfect chooser between the
+two would reach).
 
 Two combination strategies are compared, deliberately in order of increasing
-capacity, because the training set is only 597 rows:
+capacity, because the training split is only ~670 rows:
 
 1. **Probability blend** -- ``a * P_model + (1 - a) * P_rules``. One parameter.
 2. **Stacking** -- a logistic-regression meta-learner over both models'
@@ -20,6 +21,10 @@ is touched once per strategy at the end. Stacking is evaluated with
 ``StackingClassifier``, whose internal cross-fitting means the meta-learner never
 sees a base model's prediction on a row that base model was trained on -- without
 that, stacking reports a badly optimistic number.
+
+The base model is built from train.py's TUNED entry, so it is byte-for-byte the
+pipeline that serves requests. A blend weight fitted against any other
+configuration would be the wrong weight for the deployed model.
 
 Usage::
 
@@ -82,14 +87,24 @@ def prepare(texts: list[str]) -> np.ndarray:
 
 
 def build_tfidf(task: str) -> Pipeline:
-    """The production pipeline for ``task``, identically configured."""
+    """The production pipeline for ``task``, identically configured.
+
+    Every knob comes from train.py's TUNED entry -- algorithm, penalty, class
+    weight and feature thresholds -- because a blend weight is only valid for
+    the model it was fitted against.
+    """
     tuned = TUNED.get(task, {})
     return Pipeline(
         [
             ("features", build_vectorizer(**tuned.get("features", {}))),
             (
                 "classifier",
-                build_classifier("logreg", 0, tuned.get("classifier_c", 4.0)),
+                build_classifier(
+                    tuned.get("algorithm", "logreg"),
+                    0,
+                    tuned.get("classifier_c", 4.0),
+                    tuned.get("class_weight", "balanced"),
+                ),
             ),
         ]
     )
