@@ -192,17 +192,30 @@ Two honest observations:
 
 WangchanBERTa is the standard Thai pre-trained language model, and the character
 n-gram ablation suggested subword modelling should suit Thai. It was fine-tuned
-on the same 597 training rows and scored on the same 150 held-out rows.
+on the same 597 training rows and scored on the same 150 held-out rows as every
+other model.
 
-| Sentiment approach | Accuracy | Macro-F1 |
+| Sentiment (3 classes) | Accuracy | Macro-F1 |
 |---|---|---|
 | **TF-IDF + logistic regression** | **0.740** | **0.682** |
-| WangchanBERTa fine-tuned (597 rows) | 0.547 | 0.531 |
+| WangchanBERTa fine-tuned | 0.547 | 0.531 |
 | Lexicon (rules, no training) | 0.427 | 0.422 |
 | Off-the-shelf Thai sentiment model | 0.253 | 0.200 |
 
-The transformer loses to TF-IDF by **0.151 macro-F1**. This is not a single
-unlucky run — three hyperparameter settings were tried and all lost:
+| Topic (15 classes) | Accuracy | Macro-F1 |
+|---|---|---|
+| **TF-IDF + logistic regression** | **0.727** | **0.725** |
+| Gazetteer (rules, no training) | 0.680 | 0.680 |
+| WangchanBERTa fine-tuned | 0.607 | 0.574 |
+
+TF-IDF beats the transformer by **+0.151 macro-F1 on sentiment** and **+0.152 on
+topic** — nearly the same margin on two independent tasks with very different
+class counts, which is what makes the result convincing rather than a fluke.
+
+On topic classification a **hand-written word list beats a fine-tuned 110M-parameter
+language model** (0.680 vs 0.574).
+
+It is not one unlucky run. Three sentiment settings were tried and all lost:
 
 | Epochs | LR | Batch | Class weights | Macro-F1 |
 |---|---|---|---|---|
@@ -211,24 +224,31 @@ unlucky run — three hyperparameter settings were tried and all lost:
 | 10 | 3e-5 | 16 | yes | 0.346 |
 
 Training *longer* made it worse: at 10 epochs the model collapsed to predicting
-`negative` for 121 of 150 rows. 597 examples is simply too little to fine-tune a
-110M-parameter model, while TF-IDF over character n-grams is well suited to
-exactly this regime.
+`negative` for 121 of 150 rows. The failure is qualitative as well as numerical —
+the fine-tuned model calls "ทีมชาติไทยคว้าชัยชนะอย่างงดงาม" (*Thailand won
+gloriously*) **negative**, and "มีผู้เสียชีวิต 3 ราย" (*three people died*)
+**positive**.
+
+**Why:** 597 examples is far too little to fine-tune a 110M-parameter model,
+whereas TF-IDF over character n-grams is well suited to exactly this regime. The
+practical lesson is that at this data size, more data would help more than a
+bigger model.
 
 The off-the-shelf model is a second, independent instance of the domain-mismatch
-result: it was trained on Wisesight social-media text and predicts `neutral` for
-**143 of 150** news rows. Comparing predicted distributions against the truth
-(69 positive / 31 neutral / 50 negative) makes the failure mode legible:
+result: trained on Wisesight social-media text, it predicts `neutral` for **143
+of 150** news rows. Comparing predicted distributions against the truth
+(69 positive / 31 neutral / 50 negative) makes each failure mode legible in a way
+the headline metric does not:
 
 | Model | Predicted pos / neu / neg |
 |---|---|
 | TF-IDF | 79 / 24 / 47 — well calibrated |
 | WangchanBERTa fine-tuned | 47 / 32 / 71 |
 | Lexicon | 49 / 69 / 32 — over-predicts neutral |
-| Off-the-shelf | 1 / 143 / 6 — collapsed |
+| Off-the-shelf | 1 / **143** / 6 — collapsed |
 
 Reproduce with `python train_transformer.py` then `python compare_models.py`.
-The transformer needs `torch`, `transformers`, `sentencepiece` **and**
+The transformer path needs `torch`, `transformers`, `sentencepiece` **and**
 `protobuf`; without protobuf, transformers routes WangchanBERTa's SentencePiece
 vocabulary to a TikToken converter and fails with a misleading error.
 

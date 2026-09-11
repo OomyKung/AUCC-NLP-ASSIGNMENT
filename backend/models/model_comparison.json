@@ -3,47 +3,144 @@
     "test_size": 0.2,
     "random_state": 42
   },
-  "held_out_rows": 150,
-  "true_distribution": {
-    "negative": 50,
-    "neutral": 31,
-    "positive": 69
-  },
-  "models": {
-    "lexicon (rules, no training)": {
-      "accuracy": 0.4266666666666667,
-      "f1_macro": 0.4224996555050296,
-      "predicted_distribution": {
-        "negative": 32,
-        "neutral": 69,
-        "positive": 49
+  "tasks": {
+    "sentiment": {
+      "held_out_rows": 150,
+      "classes": 3,
+      "true_distribution": {
+        "negative": 50,
+        "neutral": 31,
+        "positive": 69
+      },
+      "models": {
+        "lexicon (rules, no training)": {
+          "accuracy": 0.4266666666666667,
+          "f1_macro": 0.4224996555050296,
+          "distinct_predicted": 3,
+          "predicted_distribution": {
+            "negative": 32,
+            "neutral": 69,
+            "positive": 49
+          }
+        },
+        "TF-IDF + logistic regression": {
+          "accuracy": 0.74,
+          "f1_macro": 0.6819093695382356,
+          "distinct_predicted": 3,
+          "predicted_distribution": {
+            "negative": 47,
+            "neutral": 24,
+            "positive": 79
+          }
+        },
+        "WangchanBERTa fine-tuned (597 rows)": {
+          "accuracy": 0.5466666666666666,
+          "f1_macro": 0.5311157552536863,
+          "distinct_predicted": 3,
+          "predicted_distribution": {
+            "negative": 71,
+            "neutral": 32,
+            "positive": 47
+          }
+        },
+        "off-the-shelf: wangchan-sentiment-thai-text-model": {
+          "accuracy": 0.25333333333333335,
+          "f1_macro": 0.19972632731253423,
+          "distinct_predicted": 3,
+          "predicted_distribution": {
+            "negative": 6,
+            "neutral": 143,
+            "positive": 1
+          }
+        }
       }
     },
-    "TF-IDF + logistic regression": {
-      "accuracy": 0.74,
-      "f1_macro": 0.6819093695382356,
-      "predicted_distribution": {
-        "negative": 47,
-        "neutral": 24,
-        "positive": 79
-      }
-    },
-    "WangchanBERTa fine-tuned (597 rows)": {
-      "accuracy": 0.5466666666666666,
-      "f1_macro": 0.5311157552536863,
-      "predicted_distribution": {
-        "negative": 71,
-        "neutral": 32,
-        "positive": 47
-      }
-    },
-    "off-the-shelf: wangchan-sentiment-thai-text-model": {
-      "accuracy": 0.25333333333333335,
-      "f1_macro": 0.19972632731253423,
-      "predicted_distribution": {
-        "negative": 6,
-        "neutral": 143,
-        "positive": 1
+    "topic": {
+      "held_out_rows": 150,
+      "classes": 15,
+      "true_distribution": {
+        "accident": 10,
+        "business": 10,
+        "crime": 10,
+        "disaster": 10,
+        "economy": 10,
+        "education": 10,
+        "entertainment": 10,
+        "environment": 10,
+        "health": 10,
+        "international": 10,
+        "other": 10,
+        "politics": 10,
+        "society": 10,
+        "sports": 10,
+        "technology": 10
+      },
+      "models": {
+        "gazetteer (rules, no training)": {
+          "accuracy": 0.68,
+          "f1_macro": 0.6799837114670876,
+          "distinct_predicted": 15,
+          "predicted_distribution": {
+            "accident": 12,
+            "business": 13,
+            "crime": 7,
+            "disaster": 13,
+            "economy": 8,
+            "education": 10,
+            "entertainment": 8,
+            "environment": 5,
+            "health": 12,
+            "international": 3,
+            "other": 18,
+            "politics": 8,
+            "society": 14,
+            "sports": 7,
+            "technology": 12
+          }
+        },
+        "TF-IDF + logistic regression": {
+          "accuracy": 0.7266666666666667,
+          "f1_macro": 0.7250708012317919,
+          "distinct_predicted": 15,
+          "predicted_distribution": {
+            "accident": 16,
+            "business": 7,
+            "crime": 9,
+            "disaster": 14,
+            "economy": 12,
+            "education": 8,
+            "entertainment": 7,
+            "environment": 11,
+            "health": 12,
+            "international": 12,
+            "other": 4,
+            "politics": 8,
+            "society": 9,
+            "sports": 10,
+            "technology": 11
+          }
+        },
+        "WangchanBERTa fine-tuned (597 rows)": {
+          "accuracy": 0.6066666666666667,
+          "f1_macro": 0.5735864621295589,
+          "distinct_predicted": 14,
+          "predicted_distribution": {
+            "accident": 17,
+            "business": 16,
+            "crime": 10,
+            "disaster": 16,
+            "economy": 10,
+            "education": 13,
+            "entertainment": 9,
+            "environment": 9,
+            "health": 13,
+            "international": 8,
+            "politics": 10,
+            "society": 4,
+            "sports": 11,
+            "technology": 4
+          }
+        }
       }
     }
   }
