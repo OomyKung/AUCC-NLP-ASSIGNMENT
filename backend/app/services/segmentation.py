@@ -820,6 +820,7 @@ def segment_transcript(
 
     if analyse:
         analyse_segments(segments)
+        repair_segment_names(segments)
     return segments, boundaries, blocks
 
 
@@ -912,3 +913,77 @@ def _enrich_with_llm(segment: Segment) -> None:
         # and not the other would read as two different people.
         segment.summary = apply_corrections(segment.summary, enrichment.corrections)
     segment.enriched_by = "llm"
+
+
+def repair_segment_names(segments: list[Segment]) -> None:
+    """Tidy ASR name damage across a whole programme, in place.
+
+    Runs at programme level rather than per segment because both repairs need
+    evidence a single story does not have: a lexicon of how names are spelled
+    elsewhere, and the repetition that reveals which prefix is the actual name.
+
+    Fixes only what can be justified -- welded suffixes and duplicate variants.
+    Names the ASR spelled wrong (``สักสิภาพร`` for ``ศศิภาพร``) are left exactly
+    as transcribed; see app/nlp/name_repair.py for why substitution was measured
+    and rejected.
+    """
+    import json
+    from collections import Counter
+    from glob import glob
+
+    from app.config import settings
+    from app.nlp.entities import PERSON_TITLES
+    from app.nlp.name_repair import build_lexicon, collapse_variants, correct_name
+
+    people = [
+        entity
+        for segment in segments
+        for entity in segment.entities
+        if entity.get("label") == "PERSON"
+    ]
+    if not people:
+        return
+
+    # Chat is typed by people, so its spelling is a human's rather than an
+    # ASR's -- the best evidence available here.
+    chat_texts: list[str] = []
+    for path in sorted(glob(str(settings.chat_snapshot_dir / "*.jsonl"))):
+        try:
+            with open(path, encoding="utf-8") as handle:
+                for line in handle:
+                    try:
+                        chat_texts.append(json.loads(line).get("text") or "")
+                    except json.JSONDecodeError:
+                        continue
+        except OSError:
+            continue
+
+    lexicon = build_lexicon(chat_texts, [segment.text for segment in segments])
+
+    def split(value: str) -> tuple[str, str]:
+        for title in sorted(PERSON_TITLES, key=len, reverse=True):
+            if value.startswith(title):
+                return title, value[len(title) :]
+        return "", value
+
+    bodies = [split(entity["text"])[1] for entity in people]
+    stems = collapse_variants(bodies)
+
+    for entity in people:
+        title, body = split(entity["text"])
+        repaired = correct_name(stems.get(body, body), lexicon)
+        if repaired and repaired != body:
+            entity["text"] = title + repaired
+
+    # Collapsing turns several variants into one name, so a segment can end up
+    # listing the same person repeatedly.
+    for segment in segments:
+        seen: set[tuple[str, str]] = set()
+        unique: list[dict] = []
+        for entity in segment.entities:
+            key = (entity.get("text", ""), entity.get("label", ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(entity)
+        segment.entities = unique

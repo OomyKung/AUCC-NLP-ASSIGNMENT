@@ -318,9 +318,8 @@ a correction is a claim a reader should be able to check. Without a key the
 pipeline behaves exactly as before, so nothing here is load-bearing for a fresh
 clone or an offline demo.
 
-**What was fixable locally was fixed.** The rule-based extractor had defects of
-its own, independent of the ASR, and removing 275 spurious entities needed no
-model at all:
+**What was fixable locally was fixed**, and it needed no model. Two classes of
+damage turned out to be the extractor's own, not the ASR's:
 
 | Defect | Before | After |
 |---|---|---|
@@ -328,7 +327,31 @@ model at all:
 | `เลย` read as the province Loei, when it is far more often the everyday word "at all" | 102 | **0** |
 | Verbs welded onto names (`นายทรงพลขับ`) and single-character names (`นางสาวน`) | — | filtered |
 
-Total entities 1,268 → 990, PERSON 535 → 372.
+A third class is the ASR welding the *next word* onto a name, so one person
+becomes many — `ไอซ์` appeared as `ไอซ์ดำ`, `ไอซ์รัก`, `ไอซ์เนี่ย` and four more.
+Two repairs run at programme level, because neither has enough evidence inside a
+single story:
+
+- **Welded suffixes are trimmed against a lexicon** built from the chat (typed by
+  people, so the spelling is a human's) and every stored transcript.
+- **Variants collapse onto their stem**, but only when the extractor also saw
+  that stem *standing alone* — without that guard `สุพนัส`, `สุภาพร` and
+  `สุริยัน`, three different people, merge onto `สุ`.
+
+Total entities **1,268 → 926**, PERSON **535 → 318**.
+
+**General spelling correction was built, measured and rejected.** Edit-distance
+matching against the same lexicon did repair `อำสิน` → `ออมสิน` and `อัถสิทธิ์` →
+`อภิสิทธิ์` — and in the same pass turned `สุภาพร` into `สุภา`, `ชาดา` into
+`มาหา` and `รัชนก` into `รัชดา`, at roughly **40% precision**. A name that is
+confidently wrong is worse than one that is visibly garbled, because a reader
+cannot tell it happened. Only suffix removal ships, which substitutes no
+characters at all.
+
+Widening the name window from two tokens to three was also tried and reverted: it
+cannot rescue a mangled name either, because the tokeniser splits
+`อำสินสักสิภาพรจันทวิสูตร` into **nine fragments** — it is not real Thai words —
+while it doubled the over-long junk spans from 20 to 44.
 
 #### Jumping straight to the moment
 
@@ -735,7 +758,7 @@ thai-news-nlp/
 │   │       ├── entities.py          rule/gazetteer NER
 │   │       └── backends/            sklearn, gazetteer, lexicon, transformer
 │   ├── models/                      trained artefacts + metrics.json (committed)
-│   ├── tests/                       302 tests
+│   ├── tests/                       309 tests
 │   ├── build_dataset.py             merge + validate the labelled dataset
 │   ├── train.py                     train the classifiers
 │   ├── evaluate.py                  write models/metrics.json
@@ -1068,7 +1091,7 @@ failure, so the application never breaks without a key.
 ## Testing
 
 ```powershell
-cd backend  && python -m pytest      # 302 tests
+cd backend  && python -m pytest      # 309 tests
 cd frontend && npm run test          # 16 rendering tests
 ```
 

@@ -59,6 +59,11 @@ _NAME_STOP_WORDS: frozenset[str] = frozenset(
         "ขับ", "เข้า", "ออก", "ถูก", "พา", "นำ", "ขอ", "ทำ", "เดิน", "วิ่ง",
         "ขึ้น", "ลง", "อยู่", "ต้อง", "เคย", "กำลัง", "เลย", "ด้วย", "กับ",
         "เจอ", "พบ", "รับ", "ส่ง", "บอก", "ถาม", "ตอบ", "คิด", "รู้",
+        # Polite particles, which is how most welds actually end. They must be
+        # in the list for the longest-match strip to see them: without "ครับ",
+        # "ก้อยครับ" matched the "รับ" inside it and became "ก้อยค".
+        "ครับ", "ค่ะ", "คะ", "นะครับ", "นะคะ", "ครับผม", "จ้า", "จ้ะ", "นะ",
+        "เนี่ย", "เนาะ", "อ่ะ", "ฮะ", "ไง", "ล่ะ", "สิ",
     }
 )
 
@@ -67,7 +72,16 @@ _NAME_STOP_WORDS: frozenset[str] = frozenset(
 # real name -- because "คุณ" is a personal title and the extractor took
 # whatever followed it.
 _NOT_A_PERSON: frozenset[str] = frozenset(
-    {"ผู้ชม", "ผู้ฟัง", "ผู้อ่าน", "ท่าน", "ทุกท่าน", "ผู้ชมครับ", "ผู้ชมค่ะ"}
+    {
+        # The presenter addressing the audience.
+        "ผู้ชม", "ผู้ฟัง", "ผู้อ่าน", "ท่าน", "ทุกท่าน", "ผู้ชมครับ", "ผู้ชมค่ะ",
+        # Roles and address terms. Thai uses คุณ with an occupation the way
+        # English uses "Officer" or "Doctor", so "คุณตำรวจ" is a form of
+        # address, not somebody's name.
+        "ตำรวจ", "หมอ", "ครู", "อาจารย์", "พี่", "น้อง", "ลุง", "ป้า", "น้า", "อา",
+        "ทนาย", "ทนายความ", "นักข่าว", "ผู้สื่อข่าว", "เจ้าหน้าที่", "ผู้ประกาศ",
+        "ใช้", "กัน", "เอง", "ไหน", "อะไร", "ใคร",
+    }
 )
 
 # A Thai given name is at least two characters; a single character after a
@@ -103,6 +117,24 @@ _QUANTITY = re.compile(
 )
 
 
+def _strip_welded_suffix(name: str) -> str:
+    """Remove a non-name word welded onto the end of a name token.
+
+    The tokeniser sometimes emits a name and the following word as a single
+    token, so the loop above never sees a boundary to stop at and produces
+    "นายทรงพลขับ" -- a name with the verb "drive" attached. Stripping is
+    restricted to a curated list rather than any dictionary word, because Thai
+    nicknames *are* ordinary words (ก้อย "little finger", จูน "June") and a
+    general rule would delete real names.
+    """
+    for word in sorted(_NAME_STOP_WORDS | _NOT_A_PERSON, key=len, reverse=True):
+        if len(word) >= 2 and name.endswith(word):
+            trimmed = name[: -len(word)]
+            if len(trimmed) >= MIN_NAME_CHARS:
+                return trimmed
+    return name
+
+
 class RuleEntityRecognizer:
     """Extract Thai entities using titles, gazetteers and patterns."""
 
@@ -126,6 +158,11 @@ class RuleEntityRecognizer:
                 continue
 
             parts: list[str] = []
+            # Two tokens. Widening to three was tried and reverted: it did
+            # not rescue ASR-mangled names -- the tokeniser splits
+            # "อำสินสักสิภาพรจันทวิสูตร" into NINE fragments, because it is not
+            # real Thai words -- while it doubled the over-long junk spans
+            # (20 -> 44). No window recovers a name the ASR never spelled.
             for candidate in tokens[index + 1 : index + 3]:
                 # Stop at punctuation, digits or another title.
                 if candidate in PERSON_TITLES or candidate.isdigit():
@@ -136,7 +173,7 @@ class RuleEntityRecognizer:
                     break
                 parts.append(candidate)
 
-            name = "".join(parts)
+            name = _strip_welded_suffix("".join(parts))
             # A single character after a title is a tokenisation artefact.
             if len(name) >= MIN_NAME_CHARS:
                 found.append(token + name)

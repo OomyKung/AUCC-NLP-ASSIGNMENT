@@ -700,3 +700,91 @@ def test_ambiguous_province_needs_a_location_prefix():
 
     place = recogniser.extract("เกิดเหตุที่จังหวัดเลยเมื่อคืนนี้")
     assert any(e.label == "LOCATION" for e in place)
+
+
+# --------------------------------------------------------------------------
+# Name repair from the project's own evidence
+# --------------------------------------------------------------------------
+
+
+def _lexicon(**weights):
+    from collections import Counter
+
+    return Counter(weights)
+
+
+def test_welded_suffix_is_trimmed_against_the_lexicon():
+    """The ASR welds the next word onto a name, so one person becomes many:
+    ไอซ์ appeared as ไอซ์ดำ, ไอซ์รัก, ไอซ์เนี่ย and four more."""
+    from app.nlp.name_repair import correct_name
+
+    lexicon = _lexicon(**{"ไอซ์": 72})
+
+    assert correct_name("ไอซ์เนี่ย", lexicon) == "ไอซ์"
+    assert correct_name("ไอซ์ไง", lexicon) == "ไอซ์"
+
+
+def test_a_real_name_is_not_truncated_to_a_shorter_one():
+    """The failure this guard exists for. Thai given names are built from
+    components that are themselves names, so "the stem is attested" is not on
+    its own evidence that the rest is not part of the name."""
+    from app.nlp.name_repair import correct_name
+
+    lexicon = _lexicon(**{"สุภา": 5, "เลิศ": 6, "มัลิ": 14})
+
+    assert correct_name("สุภาพร", lexicon) == "สุภาพร"
+    assert correct_name("เลิศศักดิ์", lexicon) == "เลิศศักดิ์"
+    assert correct_name("มัลิกา", lexicon) == "มัลิกา"
+
+
+def test_an_attested_spelling_is_never_overruled():
+    from app.nlp.name_repair import correct_name
+
+    lexicon = _lexicon(**{"ชัยชนก": 4, "ชัย": 90})
+
+    assert correct_name("ชัยชนก", lexicon) == "ชัยชนก"
+
+
+def test_variants_collapse_onto_a_stem_that_was_seen_alone():
+    from app.nlp.name_repair import collapse_variants
+
+    bodies = ["กัน", "กันจอม", "กันติด", "กันพูด", "กันนะ"]
+
+    mapping = collapse_variants(bodies)
+
+    assert {mapping[b] for b in bodies} == {"กัน"}
+
+
+def test_different_people_sharing_a_prefix_do_not_collapse():
+    """สุพนัส, สุภาพร and สุริยัน are three people. Collapsing them onto "สุ"
+    would merge them, so a stem is only accepted when it was itself observed
+    standing alone -- and "สุ" never is."""
+    from app.nlp.name_repair import collapse_variants
+
+    bodies = ["สุพนัส", "สุภาพร", "สุริยัน", "สุรินทร์"]
+
+    mapping = collapse_variants(bodies)
+
+    assert mapping == {b: b for b in bodies}
+
+
+def test_lexicon_harvest_tokenises_instead_of_pattern_matching():
+    """A regex character class runs straight through the following words,
+    because Thai has no boundaries: น้องออมสินสวยมาก yields ออมสินสวยมาก."""
+    from app.nlp.name_repair import build_lexicon
+
+    lexicon = build_lexicon(["น้องออมสินสวยมาก", "แฟนออมสินหล่อ"], [])
+
+    assert lexicon.get("ออมสิน", 0) > 0
+    assert not any("สวยมาก" in term for term in lexicon)
+
+
+def test_an_asr_misspelling_is_left_alone_rather_than_guessed():
+    """สักสิภาพร is never written correctly anywhere in this project's data, so
+    there is nothing to correct it from. Inventing a plausible Thai name would
+    look better and be worse, because a reader cannot tell the two apart."""
+    from app.nlp.name_repair import correct_name
+
+    lexicon = _lexicon(**{"ศศิ": 9, "ภาพร": 5})
+
+    assert correct_name("สักสิภาพร", lexicon) == "สักสิภาพร"
