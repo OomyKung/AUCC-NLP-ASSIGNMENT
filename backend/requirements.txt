@@ -23,9 +23,10 @@ scipy==1.18.1
 pandas==3.0.5
 joblib==1.6.0
 
-# --- Data collection (YouTube live chat) ---
+# --- Data collection (YouTube live chat, transcripts, video frames) ---
 yt-dlp==2026.8.19
 httpx==0.28.1
+pillow==12.3.0            # crops video frames out of YouTube storyboard sheets
 
 # --- Testing ---
 pytest==9.1.1

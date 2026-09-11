@@ -26,6 +26,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base, UtcDateTime, utcnow
 
 if TYPE_CHECKING:
+    from app.models.broadcast import VideoTranscript
     from app.models.news import NewsArticle
 
 
@@ -62,6 +63,11 @@ class ChatStream(Base):
     )
     windows: Mapped[list[NewsArticle]] = relationship(
         back_populates="stream", lazy="select"
+    )
+    # What the newsreader said, as opposed to what the audience said. One video
+    # has at most one transcript; re-fetching replaces it.
+    transcript: Mapped[VideoTranscript | None] = relationship(
+        back_populates="stream", cascade="all, delete-orphan", uselist=False
     )
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid

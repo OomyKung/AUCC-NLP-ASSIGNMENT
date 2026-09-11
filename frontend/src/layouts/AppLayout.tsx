@@ -48,6 +48,12 @@ const NAV: NavItem[] = [
     icon: icon('M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 2-4.35-4.35'),
   },
   {
+    to: '/timeline',
+    label: 'ไทม์ไลน์ข่าว',
+    labelEn: 'News Timeline',
+    icon: icon('M4 6h16M4 12h10M4 18h7'),
+  },
+  {
     to: '/analyze',
     label: 'วิเคราะห์ข่าว',
     labelEn: 'Analyze News',

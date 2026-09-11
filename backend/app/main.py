@@ -12,9 +12,10 @@ import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import analyze, evaluation, meta, news, statistics
+from app.api import analyze, broadcast, evaluation, meta, news, statistics
 from app.config import settings
 from app.database.session import init_db
 
@@ -58,6 +59,18 @@ def create_app() -> FastAPI:
     app.include_router(statistics.router, prefix=settings.api_prefix)
     app.include_router(analyze.router, prefix=settings.api_prefix)
     app.include_router(evaluation.router, prefix=settings.api_prefix)
+    app.include_router(broadcast.router, prefix=settings.api_prefix)
+
+    # Captured video frames are served straight from the data directory.
+    # They are files rather than database blobs because they are static,
+    # cacheable and regenerable, and because SQLite is a poor image store.
+    frames_dir = settings.data_dir / "frames"
+    frames_dir.mkdir(parents=True, exist_ok=True)
+    app.mount(
+        "/media/frames",
+        StaticFiles(directory=frames_dir),
+        name="frames",
+    )
 
     @app.get("/", include_in_schema=False)
     def root() -> dict:

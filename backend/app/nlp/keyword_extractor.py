@@ -29,7 +29,9 @@ MIN_TERM_LENGTH = 2
 TITLE_BOOST = 1.6
 
 
-def keyword_candidates(tokens: list[str]) -> list[str]:
+def keyword_candidates(
+    tokens: list[str], exclude: frozenset[str] | None = None
+) -> list[str]:
     """The terms that are allowed to become keywords.
 
     Used by **both** ``fit`` and ``extract``. They previously applied different
@@ -49,10 +51,13 @@ def keyword_candidates(tokens: list[str]) -> list[str]:
     result, but they are function words with no topical value -- leaving them in
     made ไม่ the single most frequent "keyword" in the corpus.
     """
+    blocked = exclude or frozenset()
     return [
         token
         for token in filter_tokens(tokens, protect_polarity=False)
-        if len(token) >= MIN_TERM_LENGTH and THAI_CHARS.search(token)
+        if len(token) >= MIN_TERM_LENGTH
+        and THAI_CHARS.search(token)
+        and token not in blocked
     ]
 
 
@@ -135,6 +140,7 @@ class TfidfKeywordExtractor:
         count: int | None = None,
         *,
         title: str | None = None,
+        exclude: frozenset[str] | None = None,
     ) -> list[Keyword]:
         """Return the top keywords, highest score first.
 
@@ -144,6 +150,10 @@ class TfidfKeywordExtractor:
             count: How many keywords to return.
             title: Optional headline; terms appearing in it are boosted, since a
                 headline word is usually what the document is about.
+            exclude: Extra terms to reject. Used for broadcast transcripts,
+                whose spoken filler (``ผู้ชม``, ``อ่า``) is not in the general
+                stopword list -- that list defines the trained models' feature
+                space, so adding to it would change every model metric.
         """
         limit = count or settings.keyword_max_count
 
@@ -152,7 +162,7 @@ class TfidfKeywordExtractor:
 
             tokens = get_tokenizer().tokenize(text or "")
 
-        candidates = keyword_candidates(tokens)
+        candidates = keyword_candidates(tokens, exclude)
         if not candidates:
             return []
 

@@ -118,6 +118,47 @@ CHAT_STOPWORDS: frozenset[str] = frozenset(
 )
 
 # Punctuation and symbols the tokenizer emits as standalone tokens.
+# Filler specific to broadcast speech, found by measurement rather than guessed:
+# these are the terms that surfaced as "keywords" in a large share of the stories
+# in one 249-minute Thai news programme, and a term that appears in half the
+# stories cannot be distinguishing one from another.
+#
+#   ผู้ชม   48% of stories -- "คุณผู้ชม", the presenter addressing the audience
+#   อ่า     12%            -- hesitation noise the ASR transcribes literally
+#   เงี้ย    9%            -- colloquial "like this"
+#   ท่าน     9%            -- bare honorific, no referent of its own
+#   ที่นี่    6%            -- "here"
+#   บอ       7%            -- an ASR fragment, not a word
+#
+# Deliberately NOT included: ข่าว (news), จันทร์/อาทิตย์ (day names), เช้า
+# (morning). They recur because of what the programme is, but they can still
+# carry meaning in a specific story, and over-trimming a keyword list is worse
+# than leaving a weak term in.
+#
+# This set is applied ONLY to keyword extraction on broadcast transcripts. It is
+# kept out of the general stopword list on purpose: the trained classifiers'
+# feature space is built from that list, so adding words to it would silently
+# change every model metric in the project.
+BROADCAST_FILLER: frozenset[str] = frozenset(
+    {
+        "ผู้ชม",
+        "คุณผู้ชม",
+        "อ่า",
+        "เงี้ย",
+        "ท่าน",
+        "ที่นี่",
+        "บอ",
+        "ครับผม",
+        "ค่ะ",
+        "นะคะ",
+        "อือ",
+        "เอ่อ",
+        "แบบนี้",
+        "อย่างเงี้ย",
+    }
+)
+
+
 PUNCTUATION_TOKENS: frozenset[str] = frozenset(
     set("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~") | {"…", "ฯ", "“", "”", "‘", "’", "—", "–"}
 )

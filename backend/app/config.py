@@ -98,6 +98,24 @@ class Settings(BaseSettings):
     nlp_sentiment_blend_alpha: float = 0.85
     nlp_ner_backend: Literal["rules", "pythainlp"] = "rules"
 
+    # ------------------------------------------------- transcripts (video audio)
+    # Where the spoken news content comes from.
+    #   youtube : YouTube's own ASR of the original Thai audio ("automatic
+    #             captions", th-orig track). Already computed, arrives with
+    #             millisecond timings, and a four-hour programme downloads in
+    #             about a second.
+    #   whisper : transcribe the audio ourselves with openai-whisper. Better
+    #             provenance for a paper, but hours of CPU per programme and an
+    #             extra ~2 GB of dependencies, so it is opt-in.
+    transcript_backend: Literal["youtube", "whisper"] = "youtube"
+    whisper_model: str = "small"
+
+    # Story segmentation. A news item is rarely shorter than a minute, and
+    # without a floor the depth score produces runs of boundaries around one
+    # transition and the timeline fills with eight-second "stories".
+    segment_min_seconds: int = 60
+    segment_block_seconds: int = 30
+
     # Optional Hugging Face models (only loaded when a transformer backend is on).
     hf_topic_model: str = "airesearch/wangchanberta-base-att-spm-uncased"
     hf_sentiment_model: str = "phoner45/wangchan-sentiment-thai-text-model"

@@ -92,6 +92,7 @@ class NLPPipeline:
         with_summary: bool = True,
         with_entities: bool = True,
         keyword_count: int | None = None,
+        keyword_exclude: frozenset[str] | None = None,
     ) -> AnalysisResult:
         """Run the full pipeline over one document.
 
@@ -104,6 +105,9 @@ class NLPPipeline:
                 nothing (per-message chat sentiment, for instance).
             with_entities: Skip entity extraction when not needed.
             keyword_count: Override how many keywords to return.
+            keyword_exclude: Extra terms barred from becoming keywords. Used for
+                broadcast transcripts, where spoken filler would otherwise
+                dominate -- see app.nlp.stopwords.BROADCAST_FILLER.
         """
         started = time.perf_counter()
         parts = self.components
@@ -129,6 +133,7 @@ class NLPPipeline:
             preprocessing.tokens,
             keyword_count,
             title=title,
+            exclude=keyword_exclude,
         )
 
         summary: Summary | None = None

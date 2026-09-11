@@ -128,6 +128,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Import chat without running the NLP pipeline over it.",
     )
     parser.add_argument(
+        "--no-broadcast",
+        action="store_true",
+        help="Skip rebuilding story timelines from transcript snapshots.",
+    )
+    parser.add_argument(
         "--limit", type=int, default=None, help="Max messages per snapshot."
     )
     args = parser.parse_args(argv)
@@ -176,6 +181,29 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  IDF fitted on {documents} windows")
                 for stream in db.scalars(select(ChatStream).order_by(ChatStream.id)):
                     analyse_stream(db, stream, pipeline)
+
+    # ------------------------------------------------------- spoken content
+    # Rebuild the story timelines from committed transcript snapshots. No
+    # network: the transcripts are on disk and the frames are already cached,
+    # which is the whole point -- a demo must not depend on YouTube being up.
+    if not args.no_broadcast:
+        snapshots = sorted((settings.data_dir / "transcripts").glob("*.json"))
+        if snapshots:
+            print()
+            print(f"Rebuilding story timelines from {len(snapshots)} transcript(s)...")
+            from app.services.broadcast import analyse_video
+
+            for snapshot in snapshots:
+                video_id = snapshot.stem
+                try:
+                    with SessionLocal() as db:
+                        result = analyse_video(db, video_id, with_frames=True)
+                    print(
+                        f"  {video_id:14} {result.segment_count:>3} stories, "
+                        f"{result.frames_captured:>3} frames"
+                    )
+                except Exception as exc:  # noqa: BLE001 - one bad file must not stop the seed
+                    print(f"  {video_id:14} skipped: {type(exc).__name__}: {exc}")
 
     with SessionLocal() as db:
         totals = {

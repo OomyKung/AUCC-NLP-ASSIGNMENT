@@ -8,16 +8,19 @@
  */
 
 import type {
+  AnalyseVideoResult,
   AnalyzeResult,
   BackendStatus,
-  Evaluation,
   ChatMessage,
+  Evaluation,
   Health,
   IngestResult,
   KeywordCount,
   NewsDetail,
   NewsFilters,
   NewsPage,
+  Programme,
+  SegmentPage,
   SnapshotInfo,
   Statistics,
   Stream,
@@ -138,6 +141,18 @@ export const api = {
   newsMessages: (id: number, limit = 200) =>
     request<ChatMessage[]>(`/news/${id}/messages${query({ limit })}`),
   deleteNews: (id: number) => request<void>(`/news/${id}`, { method: 'DELETE' }),
+
+  programmes: () => request<Programme[]>('/broadcast/programmes'),
+  programme: (videoId: string) =>
+    request<Programme>(`/broadcast/programmes/${videoId}`),
+  segments: (filters: { video_id?: string; topic?: string; limit?: number } = {}) =>
+    request<SegmentPage>(`/broadcast/segments${query(filters as Record<string, unknown>)}`),
+  analyseVideo: (url: string, withFrames = true) =>
+    request<AnalyseVideoResult>('/broadcast/analyse', {
+      method: 'POST',
+      body: JSON.stringify({ url, with_frames: withFrames }),
+      headers: { 'Content-Type': 'application/json' },
+    }),
 
   analyze: (
     payload: {

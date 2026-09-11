@@ -303,3 +303,74 @@ export interface Evaluation {
   }
   tasks: Record<string, TaskEvaluation>
 }
+
+
+/* -------------------------------------------------------------------------
+ * Spoken content: what the newsreader said, as opposed to the chat.
+ * ---------------------------------------------------------------------- */
+
+/** One story detected inside a programme's audio. */
+export interface NewsSegment {
+  id: number
+  position: number
+  start_ms: number
+  end_ms: number
+  duration_ms: number
+  /** H:MM:SS label as a viewer reads it. */
+  timecode: string
+  headline: string
+  summary: string
+  topic: string
+  topic_label: string
+  topic_color: string
+  topic_confidence: number
+  sentiment: string
+  sentiment_label: string
+  sentiment_confidence: number
+  keywords: string[]
+  entities: { text: string; label: string }[]
+  /** Bounded excerpt of what was said, for the expander. */
+  transcript_text_preview: string
+  /** Which signals put a boundary here, so a split can be explained. */
+  boundary_reasons: string[]
+  boundary_confidence: number
+  /** Deep link straight to the moment this story starts. */
+  youtube_url: string
+  /** Frame captured from the video at that moment. */
+  frame_url: string | null
+}
+
+export interface BroadcastTranscript {
+  source: string
+  language: string
+  duration_ms: number
+  cue_count: number
+  character_count: number
+}
+
+export interface Programme {
+  video_id: string
+  title: string | null
+  channel: string | null
+  url: string
+  transcript: BroadcastTranscript | null
+  segment_count: number
+  segments: NewsSegment[]
+}
+
+export interface SegmentPage {
+  total: number
+  limit: number
+  offset: number
+  items: NewsSegment[]
+}
+
+export interface AnalyseVideoResult {
+  video_id: string
+  transcript_source: string
+  duration_ms: number
+  cue_count: number
+  segment_count: number
+  frames_captured: number
+  frame_note: string
+}

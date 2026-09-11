@@ -1,11 +1,19 @@
 # Thai News Intelligence Dashboard
 
-NLP-powered analysis of Thai news and the audience reaction to it. The system
-collects Thai **YouTube live chat** from news-channel streams, groups it into
-analysable windows, and runs a full Thai NLP pipeline over it: topic
-classification into 15 categories, sentiment analysis, keyword extraction,
-extractive summarisation and named-entity recognition — all presented through a
-dashboard that shows *why* it reached each result.
+NLP-powered analysis of Thai news video and the audience reaction to it.
+
+The system reads a news broadcast **two ways at once**:
+
+- **What the newsreader said** — it transcribes the video audio, splits the
+  programme into individual stories, works out each one's topic, captures a frame
+  at the moment it starts, and links straight to that second.
+- **What the audience said** — it collects the live chat, groups it into
+  analysable windows, and scores the reaction.
+
+Both run through the same Thai NLP pipeline: topic classification into 15
+categories, sentiment analysis, keyword extraction, extractive summarisation and
+named-entity recognition — presented through a dashboard that shows *why* it
+reached each result.
 
 Built as a university NLP course project. Every number on screen is computed by
 the pipeline; nothing is hard-coded or mocked.
@@ -17,6 +25,7 @@ the pipeline; nothing is hard-coded or mocked.
 - [Quick start (Windows)](#quick-start-windows)
 - [Windows gotchas](#windows-gotchas-read-this-if-something-fails)
 - [What it does](#what-it-does)
+  - [Listening to the news itself](#listening-to-the-news-itself)
 - [Results](#results)
 - [Architecture](#architecture)
 - [Data](#data)
@@ -85,8 +94,10 @@ uvicorn app.main:app --reload
 ```
 
 `seed.py` builds the database from committed files in about a minute: 50 sample
-articles plus 25,928 real Thai chat messages from six streams, analysed into 116
-windows. It needs no network access.
+articles plus 27,928 real Thai chat messages from seven streams, analysed into
+126 windows, and rebuilds the story timelines from the committed transcript
+snapshots. It needs no network access — verified by running the rebuild with
+sockets disabled.
 
 **Terminal 2 — frontend:**
 
@@ -159,6 +170,110 @@ other process, or change the port in `frontend/vite.config.ts`.
 ---
 
 ## What it does
+
+### Listening to the news itself
+
+The chat pipeline analyses what the *audience* said. This one analyses what the
+**newsreader** said, splits a programme into its individual stories, and links
+each one back to the second it was spoken.
+
+```
+video → transcript (timed Thai speech) → 30s blocks → topic per block
+      → boundary detection → stories → frame capture + deep link
+```
+
+A 249-minute programme becomes **80 stories in about 65 seconds**.
+
+#### Where the spoken text comes from
+
+`th-orig` automatic captions: YouTube's own speech recognition of the **original
+Thai audio**, not a translation of another track. It is stated plainly because it
+matters — this is YouTube's ASR, not a model this project trained.
+
+| | |
+|---|---|
+| Fetch time | ~3 s for a 249-minute programme |
+| Output | 5,575 timed cues, 169k characters of Thai |
+| Timing | millisecond start/end per cue |
+
+Two things had to be handled before the text was usable, both found by measuring
+the format rather than trusting it:
+
+- **Half the events are bare newlines** used for on-screen layout. Counting them
+  as speech doubles the cue count.
+- **Durations overlap.** 10,772 of 11,148 consecutive pairs overlapped, because
+  YouTube sizes a caption for how long it stays *on screen*, not for how long its
+  words are spoken. Every cue's end is therefore re-derived from the next cue's
+  start, capped so a long silence cannot stretch one cue across minutes.
+
+Running our own ASR is supported and off by default: `TRANSCRIPT_BACKEND=whisper`
+gives better provenance for a paper at the cost of hours of CPU per programme and
+~2 GB of dependencies.
+
+#### Finding where one story ends and the next begins
+
+Three independent signals, combined — and every boundary records which ones fired,
+so a split is explainable rather than an oracle.
+
+| Signal | What it detects | Fired |
+|---|---|---|
+| **Lexical cohesion** (TextTiling, Hearst 1997) | vocabulary changes across a gap | 76 |
+| **Topic-label change** | the classifier agrees on a new label, sustained | 52 |
+| **Music break** | `[เพลง]` sting between items | 21 |
+
+Signals are not allowed to contradict each other, and that rule was added because
+of a specific observed failure. A single report on a shot monkey was being split
+into three stories — `crime`, `politics`, `crime` — with near-identical keywords
+throughout, because the classifier wobbled on 30 seconds of speech. Two fixes:
+
+- **A label change is vetoed when cohesion is high.** If the vocabulary carried
+  straight on, it is the same story. Measured: 37 of 89 label-change gaps sat at
+  above-median cohesion. Boundaries with a second agreeing signal are kept.
+- **Isolated labels are smoothed away first.** Forward hysteresis alone refuses to
+  split at a blip, then splits at the *return* — from the blip's label the
+  following blocks look like a perfectly sustained change. A unit test pins this,
+  because it is not obvious from reading the code.
+
+Together these took the programme from 112 fragments to **80 stories**, median
+2.5 minutes, and rejoined the monkey report into one five-minute segment.
+
+#### Capturing the frame
+
+`ffmpeg` is not a dependency. YouTube already publishes **storyboards** — the
+sprite sheets its player shows when you scrub — and for this programme the finest
+track is a 3×3 grid of 320×180 tiles per sheet across 167 sheets, i.e. **a real
+frame from the video every ~10 seconds**, finer than the story boundaries.
+
+So "capture the screen at 12:30" is: find the sheet and tile covering 12:30, fetch
+that one sheet, crop the tile. No video download, no ffmpeg, a few kilobytes per
+frame. The trade-off is resolution: 320×180 is right for a timeline card and too
+small to read on-screen text. `capture_frame()` is the single place to swap in a
+full-resolution implementation if ffmpeg is ever available.
+
+#### Jumping straight to the moment
+
+Every story carries `https://www.youtube.com/watch?v=<id>&t=<seconds>s`, aimed two
+seconds early so the click lands just before the first word rather than halfway
+through it. On the timeline page the captured frame *is* the link — clicking the
+picture of the moment opens the video at that moment, so nobody scrubs a four-hour
+stream looking for one story.
+
+#### Honest limits
+
+- **Topic accuracy is lower on speech than on news prose.** The classifier is
+  trained on written articles; broadcast Thai is a different register, the same
+  domain gap already measured for chat. One segment showing CCTV of a local crash
+  was labelled `international` because the presenter mentioned สหรัฐ (the USA).
+- **Boundaries have no ground truth here.** There is no Thai topic-segmentation
+  corpus in this project, so the segmenter is evaluated by inspection and by one
+  objective proxy (adjacent segments sharing most keywords = probably one story
+  split in two). The signal counts and the boundary reasons are reported so a
+  reader can judge; no segmentation F1 is claimed, because none was measured.
+- **Keywords needed a broadcast-specific filler list.** `ผู้ชม` ("dear viewers")
+  appeared in 48% of stories. The list was built by measuring document frequency
+  across segments, not guessed, and is applied to keyword extraction only — the
+  general stopword list defines the trained models' feature space, so adding to it
+  would silently change every model metric in this README.
 
 ### Data collection
 
@@ -519,6 +634,10 @@ thai-news-nlp/
 │   │   ├── api/                     meta, news, statistics, analyze, evaluation
 │   │   ├── services/
 │   │   │   ├── collectors/          ytdlp | youtube_api | file, behind one Protocol
+│   │   │   ├── transcripts/         youtube-asr | whisper, behind one Protocol
+│   │   │   ├── segmentation.py      transcript → stories (TextTiling + signals)
+│   │   │   ├── frames.py            video frame capture from storyboards
+│   │   │   ├── broadcast.py         transcribe → segment → capture → store
 │   │   │   ├── windowing.py         messages → analysable windows
 │   │   │   ├── chat_store.py        idempotent persistence
 │   │   │   ├── ingest.py            chat → analysed documents
@@ -536,7 +655,7 @@ thai-news-nlp/
 │   │       ├── entities.py          rule/gazetteer NER
 │   │       └── backends/            sklearn, gazetteer, lexicon, transformer
 │   ├── models/                      trained artefacts + metrics.json (committed)
-│   ├── tests/                       210 tests
+│   ├── tests/                       281 tests
 │   ├── build_dataset.py             merge + validate the labelled dataset
 │   ├── train.py                     train the classifiers
 │   ├── evaluate.py                  write models/metrics.json
@@ -555,7 +674,9 @@ thai-news-nlp/
 │   ├── news_dataset.csv             836 labelled rows (training)
 │   ├── sample_news.csv              50-row display seed
 │   ├── dataset_parts/               per-category sources
-│   └── chat_snapshots/              6 real streams, 25,928 messages
+│   ├── chat_snapshots/              7 real streams, 27,928 messages
+│   ├── transcripts/                 timed speech, for offline rebuilds
+│   └── frames/                      captured video stills per story
 ├── .env.example
 └── README.md
 ```
@@ -599,7 +720,7 @@ inflate every metric downstream.
 
 ### Collected chat — `data/chat_snapshots/`
 
-25,928 real Thai messages from six streams across five channels (Thairath
+27,928 real Thai messages from seven streams across five channels (Thairath
 News/Sport, ข่าวช่อง8, เรื่องเล่าเช้านี้, บิ๊กแชมป์ FC). Committed so the
 project is reproducible and demonstrable with no network access.
 
@@ -700,6 +821,11 @@ python compare_models.py             # every approach on one split
 python train_chat_sentiment.py       # train on the Wisesight corpus
 python train_chat_sentiment.py --keep-questions   # 4-class-comparable run
 
+# Listening to the news audio
+python analyse_video.py https://youtu.be/VIDEO_ID   # transcribe + segment + frames
+python analyse_video.py VIDEO_ID --no-frames        # skip thumbnails
+python analyse_video.py --list                      # programmes already analysed
+
 # Collecting new chat
 python collect.py --search "ข่าว ไทยรัฐ live"       # find streams
 python collect.py VIDEO_ID --snapshot               # collect + save offline copy
@@ -750,6 +876,11 @@ Interactive docs: <http://127.0.0.1:8000/docs>
 | GET | `/api/statistics/keywords` | Keyword cloud data |
 | GET | `/api/streams` | Collected YouTube streams |
 | GET | `/api/evaluation` | Model metrics and confusion matrices |
+| GET | `/api/broadcast/programmes` | Videos that have a transcript |
+| GET | `/api/broadcast/programmes/{video_id}` | One programme's full story timeline |
+| GET | `/api/broadcast/segments` | Detected stories, filterable by video or topic |
+| POST | `/api/broadcast/analyse` | Transcribe a video and split it into stories |
+| GET | `/media/frames/{video_id}/{sec}.jpg` | Frame captured at a story's start |
 | POST | `/api/ingest/youtube` | Collect + analyse a stream's chat |
 | GET | `/api/ingest/snapshots` | Offline snapshots available |
 | POST | `/api/ingest/reanalyse` | Re-run the pipeline (after swapping a model) |
@@ -857,7 +988,7 @@ failure, so the application never breaks without a key.
 ## Testing
 
 ```powershell
-cd backend  && python -m pytest      # 244 tests
+cd backend  && python -m pytest      # 281 tests
 cd frontend && npm run test          # 13 rendering tests
 ```
 
@@ -865,6 +996,14 @@ Backend coverage includes Thai preprocessing and tokenisation, the YouTube
 InnerTube chat parser (including malformed input), windowing bounds, idempotent
 storage, every API endpoint with its error paths, model artefact loading
 (missing, corrupt, version-mismatched), domain routing, and snapshot integrity.
+
+The broadcast pipeline is tested on the parts that fail quietly: caption cleaning
+(layout newlines, music markers, speaker changes), cue end-time resolution against
+overlapping durations, each boundary signal in isolation, short-segment merging,
+deep-link arithmetic, and the storyboard tile maths. One of those tests found a
+real defect while being written — a single misclassified block produced a spurious
+boundary at the *return*, splitting one story in two — which is now fixed and
+pinned by the test that caught it.
 
 The blend is tested against stub members so its arithmetic is asserted exactly,
 including the case that matters most: when the two members disagree and the
