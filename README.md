@@ -157,17 +157,35 @@ output for any document you select — not a static diagram.
 
 ## Results
 
-Measured on a stratified held-out split (20%, seed 42) that the models never
-saw. `python evaluate.py` regenerates these.
+Topic and news sentiment are measured on a stratified held-out split of the news
+dataset (20%, seed 42) that the models never saw; `python evaluate.py` regenerates
+those. Chat sentiment is measured on a different corpus's official test split, so
+it is reported separately below rather than mixed into the same rows.
 
-| Task | Accuracy | Precision (macro) | Recall (macro) | F1 (macro) | 5-fold CV F1 |
+These are the models that actually serve requests. The Evaluation page marks the
+active one and opens on it, so the page cannot describe a model the API is not
+running.
+
+| Task | Serving model | Accuracy | Precision (macro) | Recall (macro) | F1 (macro) |
 |---|---|---|---|---|---|
-| **Topic** (15 classes) | 0.727 | 0.761 | 0.727 | **0.725** | 0.727 ± 0.033 |
-| **Sentiment** (3 classes) | 0.740 | 0.695 | 0.678 | **0.682** | 0.705 ± 0.043 |
+| **Topic** (15 classes) | blend (TF-IDF + gazetteer) | 0.767 | 0.786 | 0.767 | **0.763** |
+| **Sentiment** (3 classes) | TF-IDF + logistic regression | 0.753 | 0.724 | 0.689 | **0.698** |
+| **Chat sentiment** (3 classes) | TF-IDF trained on Wisesight | 0.710 | 0.668 | 0.678 | **0.673** |
 
-Random guessing would score 0.067 and 0.333 respectively. The cross-validation
-means closely match the hold-out, which indicates the split is not being
-overfitted.
+Random guessing would score 0.067, 0.333 and 0.333 respectively. Chat sentiment
+is measured on a different corpus — see *Chat sentiment* below.
+
+### How these numbers were obtained
+
+Every choice — hyperparameters, blend weight, feature configuration — was made by
+**5-fold cross-validation on the training split only**. The held-out set is scored
+once, for reporting. This matters more than any individual figure below, and one
+case shows why: a character-only feature configuration scores **0.787 accuracy /
+0.743 macro-F1** on the sentiment held-out set, comfortably the best number in
+this README. Cross-validation ranks it *below* word+char (0.694 vs 0.708), and the
+fold standard deviation is ±0.034. The held-out result is selection noise on 150
+rows, so it is not used and not claimed. Selecting on the test set would have
+bought a 0.787 headline and a model that was no better.
 
 ### Trained models vs. rule-based baselines
 
@@ -178,15 +196,64 @@ data they were designed around would flatter them.
 | Task | Trained (macro-F1) | Baseline (macro-F1) | Gain |
 |---|---|---|---|
 | Topic | 0.725 (TF-IDF + logistic regression) | 0.680 (gazetteer) | **+0.045** |
-| Sentiment | 0.682 (TF-IDF + logistic regression) | 0.422 (lexicon) | **+0.259** |
+| Sentiment | 0.698 (TF-IDF + logistic regression) | 0.422 (lexicon) | **+0.276** |
 
 Two honest observations:
 
 - **The hand-written gazetteer is genuinely competitive** for topic
-  classification, and beats the trained model on `accident` (0.909 vs 0.769) and
-  `education` (0.900 vs 0.778). Training bought far less here than for sentiment.
-- **Training was decisive for sentiment** (+0.259), where a word-list approach
+  classification, and beats the trained model on `accident` and `education`,
+  whose vocabulary is unambiguous. Training bought far less here than for
+  sentiment.
+- **Training was decisive for sentiment** (+0.276), where a word-list approach
   cannot capture context.
+
+### Blending the rule-based and trained models
+
+Because the two make *different* mistakes, averaging their probability
+distributions helps — `P = α·P_model + (1−α)·P_rules`, with α fitted on
+out-of-fold training predictions.
+
+| Topic (15 classes) | CV macro-F1 | Held-out macro-F1 | Held-out accuracy |
+|---|---|---|---|
+| TF-IDF alone | 0.720 | 0.725 | 0.727 |
+| **Blend, α = 0.85** | **0.740** | **0.763** | **0.767** |
+| Stacking (LogReg meta-learner) | 0.707 | 0.684 | 0.693 |
+
+On the 150 held-out topic rows, 18 are correct only under the rules, 26 only
+under the model, and 23 under neither — so the best *any* combination of these two
+could reach is **0.847 accuracy**. The blend captures a little under half of that
+available headroom.
+
+Two negative results worth recording:
+
+- **Stacking is worse than the plain model.** A logistic-regression meta-learner
+  over both probability vectors has 30 parameters to fit on 597 rows, and
+  overfits (0.707 vs 0.720 CV).
+- **Sentiment does not benefit from blending at all.** The same fitting procedure
+  chose **α = 1.00** — the trained model alone. Once its hyperparameters were
+  properly tuned it had absorbed everything the lexicon contributed, so the
+  shipped sentiment backend is `sklearn`, not `blend`. A blend that adds a
+  component doing no work would be decoration.
+
+### Chat sentiment: the domain gap, measured in both directions
+
+Per-message chat sentiment is a **separate model** from news sentiment. The reason
+is measured, not assumed. Scored on the Wisesight corpus's official test split
+(2,614 real Thai social-media messages):
+
+| Model | Accuracy | Macro-F1 |
+|---|---|---|
+| **TF-IDF trained on Wisesight** (serving) | **0.710** | **0.673** |
+| Majority class (always neutral) | 0.556 | 0.238 |
+| Thai polarity lexicon (rules) | 0.538 | 0.436 |
+| News-trained TF-IDF (cross-domain) | 0.319 | 0.319 |
+
+And the mirror image — the Wisesight-trained model on the news held-out split:
+**0.287 accuracy**. Each model collapses on the other's domain, which is why the
+registry keeps two and routes by stage rather than sharing one.
+
+This replaced the rule-based lexicon that previously served chat, lifting macro-F1
+from **0.436 to 0.673 (+0.237)** on the same 2,614 rows.
 
 ### Does a transformer help? No, not at this data size
 
@@ -197,18 +264,19 @@ other model.
 
 | Sentiment (3 classes) | Accuracy | Macro-F1 |
 |---|---|---|
-| **TF-IDF + logistic regression** | **0.740** | **0.682** |
+| **TF-IDF + logistic regression** | **0.753** | **0.698** |
 | WangchanBERTa fine-tuned | 0.547 | 0.531 |
 | Lexicon (rules, no training) | 0.427 | 0.422 |
 | Off-the-shelf Thai sentiment model | 0.253 | 0.200 |
 
 | Topic (15 classes) | Accuracy | Macro-F1 |
 |---|---|---|
-| **TF-IDF + logistic regression** | **0.727** | **0.725** |
+| **Blend (TF-IDF + gazetteer)** | **0.767** | **0.763** |
+| TF-IDF + logistic regression | 0.727 | 0.725 |
 | Gazetteer (rules, no training) | 0.680 | 0.680 |
 | WangchanBERTa fine-tuned | 0.560 | 0.540 |
 
-TF-IDF beats the transformer by **+0.151 macro-F1 on sentiment** and **+0.185 on
+TF-IDF beats the transformer by **+0.167 macro-F1 on sentiment** and **+0.185 on
 topic** — a large margin on two independent tasks with very different class
 counts, which is what makes the result convincing rather than a fluke.
 
@@ -417,6 +485,17 @@ python train.py --task topic         # one task
 python train.py --algorithm svm      # LinearSVC instead of logistic regression
 python evaluate.py                   # write models/metrics.json
 
+# Model selection and analysis (see Results)
+python tune.py                       # 144-point grid search, 5-fold CV
+python tune.py --task topic --quick  # smaller grid, one task
+python ensemble.py                   # fit + compare blend and stacking
+python ablation.py                   # three ablation studies
+python compare_models.py             # every approach on one split
+
+# Chat-domain sentiment (needs requirements-training.txt)
+python train_chat_sentiment.py       # train on the Wisesight corpus
+python train_chat_sentiment.py --keep-questions   # 4-class-comparable run
+
 # Collecting new chat
 python collect.py --search "ข่าว ไทยรัฐ live"       # find streams
 python collect.py VIDEO_ID --snapshot               # collect + save offline copy
@@ -435,6 +514,13 @@ npm run dev        # dev server
 npm run build      # production build
 npm run test       # 13 rendering tests
 npx tsc -b --noEmit
+```
+
+Optional extras, only needed to **retrain** (never to run the app — the fitted
+models are committed):
+
+```powershell
+pip install -r requirements-training.txt   # corpus download + transformer
 ```
 
 ---
@@ -480,13 +566,22 @@ constructs a model directly, so swapping one touches nothing else.
 To switch backends, change one line in `.env`:
 
 ```ini
-NLP_TOKENIZER=newmm                  # newmm | newmm-safe | longest | mm
-NLP_TOPIC_BACKEND=sklearn            # sklearn | transformer
-NLP_SENTIMENT_BACKEND=sklearn        # sklearn | lexicon | transformer
-NLP_CHAT_SENTIMENT_BACKEND=lexicon   # separate backend for short chat messages
-NLP_SUMMARIZER_BACKEND=extractive    # extractive | llm
-NLP_NER_BACKEND=rules                # rules | pythainlp
+NLP_TOKENIZER=newmm                    # newmm | newmm-safe | longest | mm
+NLP_TOPIC_BACKEND=blend                # sklearn | blend | transformer
+NLP_SENTIMENT_BACKEND=sklearn          # sklearn | blend | lexicon | transformer
+NLP_CHAT_SENTIMENT_BACKEND=wisesight   # wisesight | sklearn | lexicon | transformer
+NLP_SUMMARIZER_BACKEND=extractive      # extractive | llm
+NLP_NER_BACKEND=rules                  # rules | pythainlp
+
+# Blend weights, fitted by ensemble.py on out-of-fold training predictions.
+NLP_TOPIC_BLEND_ALPHA=0.85             # 1.0 = trained model alone, 0.0 = rules alone
+NLP_SENTIMENT_BLEND_ALPHA=1.0          # fitted to 1.0: the lexicon adds nothing here
 ```
+
+The values above are the defaults, and each is the measured choice rather than a
+preference — see [Results](#results). `blend` is the default for topic because it
+wins; it is *not* the default for sentiment because the fitted weight came out at
+1.0, making it identical to `sklearn` with an extra moving part.
 
 To add a new model: write one adapter class satisfying the relevant Protocol,
 register it in `registry.py`, and select it in `.env`. Then
@@ -499,11 +594,29 @@ as a baseline honestly rather than implying a fitted model.
 
 ### Why chat sentiment uses a separate backend
 
-The trained sentiment model is better on news prose, but measurably worse on
-short informal chat — it labelled 59% of real chat messages positive and scored
-`แย่ที่สุด` ("the worst") as **positive**, while the hand-built chat lexicon got
-every spot check right. On news text the reverse holds. Each is therefore used in
-the domain it was built for, which is why `NLP_CHAT_SENTIMENT_BACKEND` exists.
+The two domains are far enough apart that one model cannot serve both, and the
+gap was measured in **both** directions: the news-trained model scores 0.319 on
+the Wisesight test split, and a Wisesight-trained model scores 0.287 on the news
+split. Each collapses on the other's data. That is why
+`NLP_CHAT_SENTIMENT_BACKEND` exists as a separate setting.
+
+Chat is served by `wisesight` — TF-IDF + logistic regression trained on ~23.5k
+real human-labelled Thai social-media messages. It replaced the hand-built
+lexicon, lifting macro-F1 from 0.436 to 0.673 on the same 2,614 test rows. The
+lexicon is still the fallback when the artefact is missing, so a fresh clone
+works either way.
+
+To retrain it:
+
+```powershell
+pip install -r requirements-training.txt
+python train_chat_sentiment.py
+```
+
+The corpus (CC0-1.0, `pythainlp/wisesight_sentiment`) downloads on demand and is
+cached under `data/wisesight/`, which is gitignored — the repository redistributes
+no third-party corpus. The **model** is committed, so the download is only needed
+to retrain.
 
 ### Optional: Hugging Face transformers
 
@@ -528,7 +641,7 @@ failure, so the application never breaks without a key.
 ## Testing
 
 ```powershell
-cd backend  && python -m pytest      # 210 tests
+cd backend  && python -m pytest      # 230 tests
 cd frontend && npm run test          # 13 rendering tests
 ```
 
@@ -536,6 +649,12 @@ Backend coverage includes Thai preprocessing and tokenisation, the YouTube
 InnerTube chat parser (including malformed input), windowing bounds, idempotent
 storage, every API endpoint with its error paths, model artefact loading
 (missing, corrupt, version-mismatched), domain routing, and snapshot integrity.
+
+The blend is tested against stub members so its arithmetic is asserted exactly,
+including the case that matters most: when the two members disagree and the
+*average* of their distributions picks a third label neither would have chosen.
+Corpus-loader tests are skipped with a clear reason when the corpus has not been
+downloaded, so a fresh clone reports skips rather than failures.
 
 The frontend tests mount each real page against fixtures captured from the
 running API. That matters because an HTTP 200 on an SPA route only proves
@@ -550,13 +669,21 @@ actionable message.
 
 Stated plainly rather than hidden:
 
-- **The training set is authored, not sampled from real published news.** It is
-  labelled consistently and validated for duplicates, but it is not a citable
-  corpus. Sentiment could alternatively be trained on `pythainlp/wisesight_sentiment`
-  (~26k real Thai social-media rows) for benchmark-comparable figures.
-- **Neutral is the weakest sentiment class** (F1 0.473) with only 152 training
+- **The news training set is authored, not sampled from real published news.**
+  It is labelled consistently and validated for duplicates, but it is not a
+  citable corpus, and it is the binding constraint on the topic and news-sentiment
+  figures. 747 rows over 15 categories is ~40 training examples per class.
+  *Chat* sentiment no longer has this problem: it is trained on the Wisesight
+  corpus (CC0, ~23.5k real human-labelled Thai social-media messages) and
+  reported on that corpus's official test split.
+- **Neutral is the weakest sentiment class** (F1 0.491) with only 152 training
   examples against 345 positive. The class imbalance is compensated with
   balanced class weights, but more neutral data is the real fix.
+- **A 144-point hyperparameter search moved topic by ~0.000 and sentiment by
+  +0.029 CV macro-F1.** When exhaustive tuning cannot move a model, the limit is
+  the data, not the configuration. The transformer result points the same way: a
+  110M-parameter pre-trained Thai model scored *worse* than TF-IDF on both tasks,
+  which is what happens when there is too little data to fine-tune on.
 - **`economy` / `business` / `technology` confuse each other** (F1 0.45–0.57).
   Their vocabulary genuinely overlaps.
 - **Topic confidence is lower on chat than on news** (≈0.41 vs ≈0.73). The model

@@ -93,6 +93,16 @@ def _build_topic() -> tuple[TopicBackend, BackendStatus]:
             note = "no trained model found (run: python train.py)"
         except ImportError as exc:
             note = f"sklearn backend unavailable: {exc}"
+    elif requested == "blend":
+        try:
+            from app.nlp.backends.blended import BlendedTopicBackend
+
+            backend = BlendedTopicBackend.load(settings.nlp_topic_blend_alpha)
+            if backend is not None:
+                return backend, BackendStatus(requested, backend.name, True)
+            note = "no trained model to blend (run: python train.py)"
+        except (ImportError, ValueError) as exc:
+            note = f"blend backend unavailable: {exc}"
     elif requested == "transformer":
         try:
             from app.nlp.backends.hf_transformer import HFTopicBackend
@@ -118,16 +128,36 @@ def _build_sentiment(
         backend = LexiconSentimentBackend()
         return backend, BackendStatus(requested, backend.name, False)
 
-    if requested == "sklearn":
+    if requested in {"sklearn", "wisesight"}:
+        # "wisesight" is the same adapter pointed at the chat-domain artefact
+        # that train_chat_sentiment.py writes, rather than the news one.
+        kind = "chat_sentiment" if requested == "wisesight" else "sentiment"
+        script = (
+            "python train_chat_sentiment.py"
+            if requested == "wisesight"
+            else "python train.py"
+        )
         try:
             from app.nlp.backends.sklearn_sentiment import SklearnSentimentBackend
 
-            backend = SklearnSentimentBackend.load()
+            backend = SklearnSentimentBackend.load(kind=kind)
             if backend is not None:
                 return backend, BackendStatus(requested, backend.name, True)
-            note = "no trained model found (run: python train.py)"
+            note = f"no trained model found (run: {script})"
         except ImportError as exc:
             note = f"sklearn backend unavailable: {exc}"
+    elif requested == "blend":
+        try:
+            from app.nlp.backends.blended import BlendedSentimentBackend
+
+            backend = BlendedSentimentBackend.load(
+                settings.nlp_sentiment_blend_alpha
+            )
+            if backend is not None:
+                return backend, BackendStatus(requested, backend.name, True)
+            note = "no trained model to blend (run: python train.py)"
+        except (ImportError, ValueError) as exc:
+            note = f"blend backend unavailable: {exc}"
     elif requested == "transformer":
         try:
             from app.nlp.backends.hf_transformer import HFSentimentBackend

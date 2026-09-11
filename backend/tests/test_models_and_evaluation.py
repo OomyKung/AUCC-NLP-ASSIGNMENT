@@ -141,7 +141,11 @@ def test_registry_prefers_trained_models_when_present():
         components = get_components()
         assert components.status["topic"].trained is True
         assert components.status["sentiment"].trained is True
-        assert components.status["topic"].active.startswith("sklearn:")
+        # The active backend must be built on the fitted model, not the
+        # rule-based cold-start path. Asserted by substring rather than prefix
+        # so wrapping the model (as the blend does) does not break the test
+        # while still failing if the gazetteer is serving alone.
+        assert "sklearn:" in components.status["topic"].active
     finally:
         reset_components()
 
@@ -155,14 +159,28 @@ def test_chat_sentiment_uses_its_own_backend():
     """Per-message chat scoring must not use the news-trained model.
 
     Measured reason: the news-trained model labelled 59% of real chat messages
-    positive and called "แย่ที่สุด" ("the worst") positive, while the chat
-    lexicon got every spot check right.
+    positive and called "แย่ที่สุด" ("the worst") positive. Cross-domain
+    accuracy was later quantified in both directions -- the news model scores
+    0.319 on the Wisesight test split, and a Wisesight-trained model scores
+    0.287 on the news split -- so the two stages must stay on separate models.
+
+    The assertion is about routing, not about which chat model wins: whether
+    chat is served by the Wisesight model or by the lexicon fallback, it must
+    not be the news-trained object.
     """
     reset_components()
     try:
         components = get_components()
-        assert components.status["chat_sentiment"].active == "lexicon"
         assert components.chat_sentiment is not components.sentiment
+        assert components.status["chat_sentiment"].active != components.status[
+            "sentiment"
+        ].active
+        # Never the news artefact.
+        assert components.status["chat_sentiment"].active in {
+            "lexicon",
+            "sklearn:logreg-wisesight",
+            "sklearn:svc-wisesight",
+        }
     finally:
         reset_components()
 
@@ -179,9 +197,14 @@ def test_pipeline_sentiment_only_routes_to_chat_backend():
     reset_components()
     try:
         pipeline = get_pipeline()
+        components = get_components()
         predictions = pipeline.sentiment_only(["แย่ที่สุด", "สุดยอดมาก"])
         assert [p.label for p in predictions] == ["negative", "positive"]
-        assert all(p.model_name == "lexicon" for p in predictions)
+        # Routed through the chat backend, whichever one is configured -- the
+        # point of the test is that news sentiment is not used for chat.
+        assert all(
+            p.model_name == components.chat_sentiment.name for p in predictions
+        )
     finally:
         reset_components()
 

@@ -40,6 +40,7 @@ from sklearn.model_selection import train_test_split  # noqa: E402
 from sklearn.pipeline import FeatureUnion, Pipeline  # noqa: E402
 
 from app.nlp.features import thai_char_preprocessor  # noqa: E402
+from train import TUNED  # noqa: E402
 from app.nlp.preprocessing import clean_text, filter_tokens  # noqa: E402
 from app.nlp.tokenizer import get_tokenizer  # noqa: E402
 
@@ -73,23 +74,42 @@ def analyser_unprotected(text: str) -> list[str]:
     return tokens + [f"{a}_{b}" for a, b in zip(tokens, tokens[1:], strict=False)]
 
 
-def _word_vectoriser(analyser) -> TfidfVectorizer:
-    return TfidfVectorizer(analyzer=analyser, min_df=2, sublinear_tf=True)
+def _tuned(task: str) -> dict:
+    """train.py's fitted settings for ``task``.
+
+    An ablation is only meaningful against the configuration that actually
+    ships. Using generic defaults here would measure the effect of removing a
+    feature from a model nobody runs.
+    """
+    return TUNED.get(task, {})
 
 
-def _char_vectoriser() -> TfidfVectorizer:
+def _word_vectoriser(analyser, task: str = "topic") -> TfidfVectorizer:
+    features = _tuned(task).get("features", {})
     return TfidfVectorizer(
-        analyzer="char_wb",
-        ngram_range=(2, 4),
-        preprocessor=thai_char_preprocessor,
-        min_df=3,
+        analyzer=analyser,
+        min_df=features.get("word_min_df", 2),
         sublinear_tf=True,
     )
 
 
-def _classifier() -> LogisticRegression:
+def _char_vectoriser(task: str = "topic") -> TfidfVectorizer:
+    features = _tuned(task).get("features", {})
+    return TfidfVectorizer(
+        analyzer="char_wb",
+        ngram_range=features.get("char_ngram_range", (2, 4)),
+        preprocessor=thai_char_preprocessor,
+        min_df=features.get("char_min_df", 3),
+        sublinear_tf=True,
+    )
+
+
+def _classifier(task: str = "topic") -> LogisticRegression:
     return LogisticRegression(
-        C=4.0, max_iter=2000, class_weight="balanced", random_state=RANDOM_STATE
+        C=_tuned(task).get("classifier_c", 4.0),
+        max_iter=2000,
+        class_weight="balanced",
+        random_state=RANDOM_STATE,
     )
 
 
@@ -153,7 +173,10 @@ def ablation_negation(texts, sentiments) -> dict:
         ("negators removed as stopwords", analyser_unprotected),
     ):
         pipeline = Pipeline(
-            [("features", _word_vectoriser(analyser)), ("classifier", _classifier())]
+            [
+                ("features", _word_vectoriser(analyser, "sentiment")),
+                ("classifier", _classifier("sentiment")),
+            ]
         )
         results[name] = _score(pipeline, x_train, y_train, x_test, y_test)
 
@@ -200,12 +223,12 @@ def ablation_aggregation(texts, topics) -> dict:
                 "features",
                 FeatureUnion(
                     [
-                        ("word", _word_vectoriser(analyser_protected)),
-                        ("char", _char_vectoriser()),
+                        ("word", _word_vectoriser(analyser_protected, "topic")),
+                        ("char", _char_vectoriser("topic")),
                     ]
                 ),
             ),
-            ("classifier", _classifier()),
+            ("classifier", _classifier("topic")),
         ]
     )
     pipeline.fit(x_train, y_train)
@@ -270,23 +293,26 @@ def ablation_features(texts, topics, sentiments) -> dict:
         "unseen words. Character n-grams do not depend on correct segmentation."
     )
 
-    configurations = {
-        "word only": lambda: _word_vectoriser(analyser_protected),
-        "char only": _char_vectoriser,
-        "word + char (default)": lambda: FeatureUnion(
-            [
-                ("word", _word_vectoriser(analyser_protected)),
-                ("char", _char_vectoriser()),
-            ]
-        ),
-    }
+    def configurations(task: str) -> dict:
+        return {
+            "word only": lambda: _word_vectoriser(analyser_protected, task),
+            "char only": lambda: _char_vectoriser(task),
+            "word + char (default)": lambda: FeatureUnion(
+                [
+                    ("word", _word_vectoriser(analyser_protected, task)),
+                    ("char", _char_vectoriser(task)),
+                ]
+            ),
+        }
 
     results: dict[str, dict] = {}
     for task, labels in (("topic", topics), ("sentiment", sentiments)):
         x_train, x_test, y_train, y_test = split(texts, labels)
         task_results = {}
-        for name, build in configurations.items():
-            pipeline = Pipeline([("features", build()), ("classifier", _classifier())])
+        for name, build in configurations(task).items():
+            pipeline = Pipeline(
+                [("features", build()), ("classifier", _classifier(task))]
+            )
             task_results[name] = _score(pipeline, x_train, y_train, x_test, y_test)
         results[task] = task_results
         table(

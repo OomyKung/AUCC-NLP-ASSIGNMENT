@@ -32,6 +32,14 @@ backend/models/*.joblib
 # Their metrics ARE committed, so the comparison tables stay reproducible.
 backend/models/wangchanberta_*/
 
+# ---- Downloaded corpora ----
+# The Wisesight corpus cache (~6 MB) is NOT committed: it is a third-party
+# corpus with its own provenance, and it is regenerable with one command.
+# The model trained from it IS committed, so a fresh clone needs no download.
+#   pip install -r requirements-training.txt
+#   python train_chat_sentiment.py
+data/wisesight/
+
 # ---- Node / frontend ----
 node_modules/
 dist/

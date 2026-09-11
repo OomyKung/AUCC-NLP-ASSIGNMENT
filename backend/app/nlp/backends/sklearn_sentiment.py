@@ -15,9 +15,16 @@ class SklearnSentimentBackend:
         self.name = model.name
 
     @classmethod
-    def load(cls) -> SklearnSentimentBackend | None:
-        """Build from the saved artefact, or ``None`` if there is not one."""
-        model = load_model("sentiment")
+    def load(cls, kind: str = "sentiment") -> SklearnSentimentBackend | None:
+        """Build from the saved artefact, or ``None`` if there is not one.
+
+        ``kind`` selects which artefact to load. ``"sentiment"`` is the
+        news-trained model; ``"chat_sentiment"`` is the one trained on the
+        Wisesight social-media corpus by ``train_chat_sentiment.py``. They are
+        separate files because the measured cross-domain transfer between news
+        prose and chat register is poor in both directions.
+        """
+        model = load_model(kind)
         return cls(model) if model is not None else None
 
     @property

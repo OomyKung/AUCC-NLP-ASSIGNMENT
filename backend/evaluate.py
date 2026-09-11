@@ -35,6 +35,7 @@ from sklearn.metrics import (  # noqa: E402
 )
 from sklearn.model_selection import train_test_split  # noqa: E402
 
+from app.config import settings  # noqa: E402
 from app.nlp.backends.gazetteer_topic import GazetteerTopicBackend  # noqa: E402
 from app.nlp.backends.lexicon_sentiment import LexiconSentimentBackend  # noqa: E402
 from app.nlp.backends.sklearn_model import load_model  # noqa: E402
@@ -47,6 +48,28 @@ METRICS_PATH = Path(__file__).resolve().parent / "models" / "metrics.json"
 # Must match train.py, or the "held-out" rows would not be held out.
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
+
+
+def blend_labels(
+    trained, rules, texts: list[str], labels: list[str], alpha: float
+) -> list[str]:
+    """Predicted labels from the weighted blend of a trained model and rules.
+
+    Mirrors app/nlp/backends/blended.py, deliberately using the same arithmetic
+    on the same inputs -- if the two drifted apart, this page would report a
+    model other than the one serving requests.
+    """
+    model_probabilities = trained.predict_proba(texts)
+    predictions: list[str] = []
+    for text, model_row in zip(texts, model_probabilities, strict=True):
+        rule_row = rules.predict(text).probabilities
+        blended = {
+            label: alpha * model_row.get(label, 0.0)
+            + (1.0 - alpha) * rule_row.get(label, 0.0)
+            for label in labels
+        }
+        predictions.append(max(blended, key=lambda label: blended[label]))
+    return predictions
 
 
 def score(
@@ -186,6 +209,27 @@ def main() -> int:
         entry["models"]["baseline"] = baseline_metrics
         print_summary(f"baseline ({baseline_name})", baseline_metrics)
 
+        # ------------------------------------------------------------ blend
+        # The blend of the two above is what actually serves requests by
+        # default, so it has to appear here: an Evaluation page that reported
+        # only the plain trained model would be describing a model that is not
+        # running. The weight comes from config, fitted by ensemble.py on
+        # out-of-fold training predictions.
+        if trained is not None:
+            alpha = (
+                settings.nlp_topic_blend_alpha
+                if task == "topic"
+                else settings.nlp_sentiment_blend_alpha
+            )
+            blend_predictions = blend_labels(
+                trained, backend, x_test, present, alpha
+            )
+            blend_metrics = score(y_test, blend_predictions, present)
+            blend_metrics["algorithm"] = f"blend({trained.algorithm}+{baseline_name})"
+            blend_metrics["alpha"] = alpha
+            entry["models"]["blend"] = blend_metrics
+            print_summary(f"blend (alpha={alpha:g})", blend_metrics)
+
         # ----------------------------------------------------- random floor
         # The score a coin-flip would get, so the reader can judge the rest.
         entry["random_baseline_accuracy"] = 1.0 / len(present) if present else 0.0
@@ -193,6 +237,28 @@ def main() -> int:
             f"  {'random guess':22} acc {entry['random_baseline_accuracy']:.4f}"
             f"  ({len(present)} classes)"
         )
+
+        # Which of the scored models is the one actually serving requests.
+        # Without this the page could show a metric table for a model the API is
+        # not using, which is exactly the kind of quiet mismatch that makes an
+        # evaluation page untrustworthy.
+        requested = (
+            settings.nlp_topic_backend
+            if task == "topic"
+            else settings.nlp_sentiment_backend
+        )
+        active = {"blend": "blend", "sklearn": "trained", "transformer": "trained"}.get(
+            requested, "baseline"
+        )
+        if active not in entry["models"]:
+            active = "trained" if "trained" in entry["models"] else "baseline"
+        # A blend at alpha=1.0 is arithmetically the trained model, so calling it
+        # a blend on the page would overstate what is running.
+        if active == "blend" and entry["models"]["blend"].get("alpha") == 1.0:
+            active = "trained"
+        entry["active_model"] = active
+        entry["configured_backend"] = requested
+        print(f"  {'serving':22} {active} (NLP backend: {requested})")
 
         if "trained" in entry["models"]:
             gain = (

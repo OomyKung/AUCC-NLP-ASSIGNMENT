@@ -54,17 +54,47 @@ class Settings(BaseSettings):
     # ----------------------------------------------------- NLP backend wiring
     # Swapping any model = change one value here (see app/nlp/registry.py).
     nlp_tokenizer: Literal["newmm", "newmm-safe", "longest", "mm"] = "newmm"
-    nlp_topic_backend: Literal["sklearn", "transformer"] = "sklearn"
-    nlp_sentiment_backend: Literal["sklearn", "lexicon", "transformer"] = "sklearn"
-    # Per-message chat sentiment uses a SEPARATE backend, defaulting to the
-    # lexicon. Measured reason: the sklearn model is trained on formal news
-    # prose, and on short informal chat it drifts badly -- it labelled 59% of
-    # real chat messages positive and called "แย่ที่สุด" ("the worst")
-    # positive, while the hand-built chat lexicon got every spot check right.
-    # The reverse holds on news text, where the trained model wins. Each is
-    # used in the domain it was built for.
-    nlp_chat_sentiment_backend: Literal["sklearn", "lexicon", "transformer"] = "lexicon"
+    # Topic blends the trained model with the gazetteer: cross-validated
+    # macro-F1 0.720 -> 0.740, held-out 0.725 -> 0.763. The two make
+    # different mistakes, so averaging them wins.
+    nlp_topic_backend: Literal["sklearn", "blend", "transformer"] = "blend"
+    # Sentiment does NOT blend. The same fitting procedure chose alpha = 1.00
+    # for it -- once the model had properly tuned hyperparameters, the lexicon
+    # contributed nothing (CV 0.7081 alone vs 0.7084 blended, identical
+    # held-out). "blend" is still available, but defaulting to it would add a
+    # component that the measurement says does no work.
+    nlp_sentiment_backend: Literal[
+        "sklearn", "blend", "lexicon", "transformer"
+    ] = "sklearn"
+    # Per-message chat sentiment uses a SEPARATE backend from news sentiment,
+    # because the domain gap between news prose and live-chat register is large
+    # and was measured in both directions:
+    #
+    #   * The news-trained model on chat: labelled 59% of real chat messages
+    #     positive and called "แย่ที่สุด" ("the worst") positive.
+    #   * A social-media-trained model on news: 0.287 accuracy.
+    #
+    # So each domain gets a model trained on its own register. "wisesight" is
+    # trained by train_chat_sentiment.py on the Wisesight corpus (~23.5k real
+    # Thai social-media messages) and scores 0.710 accuracy / 0.673 macro-F1 on
+    # that corpus's official test split. On those same 2,614 rows the lexicon
+    # it replaces scores 0.436 macro-F1 and the news-trained model 0.319, so
+    # the gain is measured against both alternatives on one test set. The
+    # lexicon remains the fallback when the artefact is absent, so a fresh
+    # clone still works.
+    nlp_chat_sentiment_backend: Literal[
+        "wisesight", "sklearn", "lexicon", "transformer"
+    ] = "wisesight"
     nlp_summarizer_backend: Literal["extractive", "llm"] = "extractive"
+
+    # Blend weights: P = alpha * P_model + (1 - alpha) * P_rules. Fitted by
+    # ensemble.py on out-of-fold training predictions -- never on the held-out
+    # set. alpha=1.0 is the trained model alone, 0.0 the rule baseline alone.
+    # Both values below are what that search selected.
+    nlp_topic_blend_alpha: float = 0.85
+    # 1.0 is not a placeholder: it is the fitted result, and the reason
+    # nlp_sentiment_backend defaults to "sklearn" rather than "blend".
+    nlp_sentiment_blend_alpha: float = 1.0
     nlp_ner_backend: Literal["rules", "pythainlp"] = "rules"
 
     # Optional Hugging Face models (only loaded when a transformer backend is on).

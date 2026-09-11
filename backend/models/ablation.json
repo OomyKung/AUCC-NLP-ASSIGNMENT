@@ -5,14 +5,14 @@
   },
   "negation": {
     "negators protected (default)": {
-      "accuracy": 0.6733333333333333,
-      "f1_macro": 0.6126617047669679,
+      "accuracy": 0.7,
+      "f1_macro": 0.6488038277511962,
       "fit_seconds": 0.4
     },
     "negators removed as stopwords": {
-      "accuracy": 0.68,
-      "f1_macro": 0.6251223313190475,
-      "fit_seconds": 0.2
+      "accuracy": 0.6933333333333334,
+      "f1_macro": 0.6462448843401224,
+      "fit_seconds": 0.3
     }
   },
   "aggregation": {
@@ -31,34 +31,34 @@
       "word only": {
         "accuracy": 0.7066666666666667,
         "f1_macro": 0.7006293038078384,
-        "fit_seconds": 0.3
+        "fit_seconds": 0.5
       },
       "char only": {
         "accuracy": 0.7133333333333334,
         "f1_macro": 0.7123208246861495,
-        "fit_seconds": 0.5
+        "fit_seconds": 0.9
       },
       "word + char (default)": {
         "accuracy": 0.7266666666666667,
         "f1_macro": 0.7250708012317919,
-        "fit_seconds": 0.9
+        "fit_seconds": 1.6
       }
     },
     "sentiment": {
       "word only": {
-        "accuracy": 0.6733333333333333,
-        "f1_macro": 0.6126617047669679,
-        "fit_seconds": 0.2
+        "accuracy": 0.7,
+        "f1_macro": 0.6488038277511962,
+        "fit_seconds": 0.4
       },
       "char only": {
-        "accuracy": 0.7533333333333333,
-        "f1_macro": 0.6966685544374144,
-        "fit_seconds": 0.3
+        "accuracy": 0.7866666666666666,
+        "f1_macro": 0.7433960671074074,
+        "fit_seconds": 0.6
       },
       "word + char (default)": {
-        "accuracy": 0.74,
-        "f1_macro": 0.6819093695382356,
-        "fit_seconds": 0.5
+        "accuracy": 0.7533333333333333,
+        "f1_macro": 0.6977082639113008,
+        "fit_seconds": 1.2
       }
     }
   }

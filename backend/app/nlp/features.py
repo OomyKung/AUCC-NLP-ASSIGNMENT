@@ -51,6 +51,7 @@ def build_vectorizer(
     *,
     word_min_df: int = 2,
     char_min_df: int = 3,
+    char_ngram_range: tuple[int, int] = (2, 4),
     max_features: int | None = 60_000,
 ) -> FeatureUnion:
     """Build the combined word + character TF-IDF feature extractor.
@@ -60,6 +61,8 @@ def build_vectorizer(
             term seen once in the whole corpus cannot become a shortcut the
             model memorises.
         char_min_df: Same, for character n-grams.
+        char_ngram_range: Character n-gram sizes. Wider ranges capture more
+            Thai morphology at the cost of a much larger vocabulary.
         max_features: Cap on each view's vocabulary size.
     """
     word = TfidfVectorizer(
@@ -70,7 +73,7 @@ def build_vectorizer(
     )
     char = TfidfVectorizer(
         analyzer="char_wb",
-        ngram_range=(2, 4),
+        ngram_range=char_ngram_range,
         preprocessor=thai_char_preprocessor,
         min_df=char_min_df,
         max_features=max_features,

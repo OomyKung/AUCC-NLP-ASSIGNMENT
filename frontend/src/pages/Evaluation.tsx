@@ -1,19 +1,22 @@
 /**
  * Evaluation page: real metrics from a held-out split.
  *
- * Two things this page does deliberately:
+ * Three things this page does deliberately:
  *
- * 1. It shows the rule-based baseline beside the trained model, scored on the
- *    *same* held-out rows. A trained model's accuracy means little without
- *    knowing what a simple approach already achieved.
+ * 1. It shows the rule-based baseline beside the trained model and their blend,
+ *    all scored on the *same* held-out rows. A trained model's accuracy means
+ *    little without knowing what a simple approach already achieved.
  * 2. It shows the random-guess floor, so a reader can judge whether the numbers
  *    are impressive for the number of classes involved.
+ * 3. It marks which model is actually serving requests and opens on it. The
+ *    dashboard's numbers come from one specific backend, and a metrics page
+ *    that quietly described a different one would be worse than no page.
  */
 
 import { useState } from 'react'
 import { ErrorState, LoadingState } from '../components/ui'
 import { useAsync } from '../hooks'
-import type { ModelMetrics, TaskEvaluation } from '../types'
+import type { ModelKey, ModelMetrics, TaskEvaluation } from '../types'
 import { api } from '../services/api'
 
 export default function EvaluationPage() {
@@ -104,16 +107,31 @@ function NotAvailable({ reason, howTo }: { reason?: string; howTo?: string[] }) 
   )
 }
 
-function TaskSection({ task, entry }: { task: string; entry: TaskEvaluation }) {
-  const trained = entry.models.trained
-  const baseline = entry.models.baseline
-  const [view, setView] = useState<'trained' | 'baseline'>(
-    trained ? 'trained' : 'baseline',
-  )
+/** Display order and Thai labels for the models evaluate.py scores. */
+const MODEL_LABELS: { key: ModelKey; thai: string }[] = [
+  { key: 'blend', thai: 'โมเดลผสม' },
+  { key: 'trained', thai: 'โมเดลที่ฝึกแล้ว' },
+  { key: 'baseline', thai: 'โมเดลฐาน' },
+]
 
-  // `trained` is optional (no artefact until train.py has run), so resolve to
-  // a definitely-present metrics object before rendering.
-  const shown: ModelMetrics = (view === 'trained' ? trained : baseline) ?? baseline
+function TaskSection({ task, entry }: { task: string; entry: TaskEvaluation }) {
+  const baseline = entry.models.baseline
+  // Only offer models that were actually scored, in a fixed order.
+  const available = MODEL_LABELS.filter(({ key }) => entry.models[key])
+  // Default to whichever model is serving requests, so the page opens on the
+  // numbers that describe the live system.
+  const active: ModelKey = entry.active_model ?? (entry.models.trained ? 'trained' : 'baseline')
+  const [view, setView] = useState<ModelKey>(active)
+
+  // `baseline` is the only model guaranteed present (there is no artefact until
+  // train.py has run), so it is the fallback.
+  const shown: ModelMetrics = entry.models[view] ?? baseline
+  // Compare against the baseline, except when the baseline is what's shown --
+  // then compare it against the serving model, so the arrow always contrasts
+  // the rule-based floor with the real system.
+  const reference: ModelMetrics | undefined =
+    view === 'baseline' ? entry.models[active] : baseline
+
   const title = task === 'topic' ? 'การจำแนกหัวข้อ (Topic)' : 'การวิเคราะห์ความรู้สึก (Sentiment)'
 
   const name = (slug: string) => entry.label_names?.[slug]?.thai ?? slug
@@ -129,58 +147,64 @@ function TaskSection({ task, entry }: { task: string; entry: TaskEvaluation }) {
           role="group"
           aria-label="เลือกโมเดล"
         >
-          {trained && (
+          {available.map(({ key, thai }) => (
             <button
+              key={key}
               type="button"
-              onClick={() => setView('trained')}
-              aria-pressed={view === 'trained'}
+              onClick={() => setView(key)}
+              aria-pressed={view === key}
               className={`rounded-lg px-3 py-1 text-xs font-medium ${
-                view === 'trained'
+                view === key
                   ? 'bg-brand-600 text-white'
                   : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'
               }`}
             >
-              โมเดลที่ฝึกแล้ว
+              {thai}
+              {key === active && (
+                <span
+                  aria-hidden="true"
+                  className={`ml-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle ${
+                    view === key ? 'bg-white/90' : 'bg-teal-500'
+                  }`}
+                />
+              )}
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setView('baseline')}
-            aria-pressed={view === 'baseline'}
-            className={`rounded-lg px-3 py-1 text-xs font-medium ${
-              view === 'baseline'
-                ? 'bg-brand-600 text-white'
-                : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'
-            }`}
-          >
-            โมเดลฐาน
-          </button>
+          ))}
         </div>
       </div>
 
-      {/* Headline metrics, trained beside baseline beside the random floor. */}
+      {/* Says plainly which model answers API requests, so the tables on this
+          page can never be mistaken for describing something else. */}
+      <p className="text-xs text-slate-500 dark:text-slate-400" lang="th">
+        <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-teal-500 align-middle" />
+        โมเดลที่ใช้งานจริง:{' '}
+        <strong className="text-slate-700 dark:text-slate-200">
+          {MODEL_LABELS.find((m) => m.key === active)?.thai ?? active}
+        </strong>
+        {entry.models[active]?.algorithm && ` (${entry.models[active]?.algorithm})`}
+      </p>
+
+      {/* Headline metrics, the shown model beside its reference and the random floor. */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           label="Accuracy"
           value={shown.accuracy}
-          compare={view === 'trained' ? baseline.accuracy : trained?.accuracy}
+          compare={reference?.accuracy}
         />
         <MetricCard
           label="Precision (macro)"
           value={shown.precision_macro}
-          compare={
-            view === 'trained' ? baseline.precision_macro : trained?.precision_macro
-          }
+          compare={reference?.precision_macro}
         />
         <MetricCard
           label="Recall (macro)"
           value={shown.recall_macro}
-          compare={view === 'trained' ? baseline.recall_macro : trained?.recall_macro}
+          compare={reference?.recall_macro}
         />
         <MetricCard
           label="F1-score (macro)"
           value={shown.f1_macro}
-          compare={view === 'trained' ? baseline.f1_macro : trained?.f1_macro}
+          compare={reference?.f1_macro}
           emphasis
         />
       </div>

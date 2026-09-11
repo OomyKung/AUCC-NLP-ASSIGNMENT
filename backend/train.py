@@ -79,7 +79,29 @@ def load_dataset(path: Path) -> tuple[list[str], dict[str, list[str]]]:
     return texts, labels
 
 
-def build_classifier(algorithm: str, class_count: int):  # noqa: ARG001
+# Per-task hyperparameters, chosen by tune.py: a 144-point grid scored with
+# 5-fold cross-validation on the TRAINING split only. Provenance is in
+# models/tuning.json.
+#
+# Topic's entry is the configuration the project already used -- the search
+# confirmed it rather than improving on it, which is worth recording as a
+# result. Sentiment moved: a weaker penalty (C 4 -> 1), a word floor of 1 and
+# longer character n-grams lifted cross-validated macro-F1 from 0.679 to 0.708.
+# Sentiment has 3 classes over 597 rows, so it can afford rarer features than
+# the 15-class topic task, where a min_df of 1 invites memorisation.
+TUNED: dict[str, dict] = {
+    "topic": {
+        "classifier_c": 4.0,
+        "features": {"word_min_df": 2, "char_min_df": 3, "char_ngram_range": (2, 4)},
+    },
+    "sentiment": {
+        "classifier_c": 1.0,
+        "features": {"word_min_df": 1, "char_min_df": 2, "char_ngram_range": (3, 5)},
+    },
+}
+
+
+def build_classifier(algorithm: str, class_count: int, penalty: float = 4.0):  # noqa: ARG001
     """Construct the classifier stage.
 
     LinearSVC is often stronger on sparse text but gives no probabilities, so it
@@ -94,7 +116,7 @@ def build_classifier(algorithm: str, class_count: int):  # noqa: ARG001
     # Multinomial handling is automatic in scikit-learn 1.9; the `multi_class`
     # argument was removed, so it must not be passed.
     return LogisticRegression(
-        C=4.0,
+        C=penalty,
         max_iter=2000,
         # Compensates for the class imbalance rather than letting the model
         # drift toward whichever label is most common.
@@ -133,10 +155,19 @@ def train_task(
     )
     print(f"train / test   : {len(x_train)} / {len(x_test)}")
 
+    tuned = TUNED.get(task, {})
+    feature_options = tuned.get("features", {})
+    penalty = tuned.get("classifier_c", 4.0)
+    print(f"features       : {feature_options or 'defaults'}")
+    print(f"C              : {penalty}")
+
     pipeline = Pipeline(
         [
-            ("features", build_vectorizer()),
-            ("classifier", build_classifier(algorithm, len(distribution))),
+            ("features", build_vectorizer(**feature_options)),
+            (
+                "classifier",
+                build_classifier(algorithm, len(distribution), penalty),
+            ),
         ]
     )
 

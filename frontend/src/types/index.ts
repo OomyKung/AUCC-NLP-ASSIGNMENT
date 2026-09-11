@@ -265,14 +265,23 @@ export interface ModelMetrics {
   algorithm: string
   trained_at?: string
   cross_validation?: CrossValidation | null
+  /** Blend weight, present only on the blended model. */
+  alpha?: number
 }
+
+/** Keys of the models evaluate.py scores on the held-out split. */
+export type ModelKey = 'trained' | 'blend' | 'baseline'
 
 export interface TaskEvaluation {
   labels: string[]
-  models: { trained?: ModelMetrics; baseline: ModelMetrics }
+  models: Partial<Record<ModelKey, ModelMetrics>> & { baseline: ModelMetrics }
   random_baseline_accuracy: number
   trained_vs_baseline_f1_macro?: number
   label_names?: Record<string, { thai: string; english: string; color: string }>
+  /** Which scored model is actually serving requests. */
+  active_model?: ModelKey
+  /** The configured NLP backend name, for display. */
+  configured_backend?: string
 }
 
 export interface Evaluation {

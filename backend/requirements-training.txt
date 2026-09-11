@@ -1,0 +1,19 @@
+# Optional dependencies -- only needed to RETRAIN models, never to run the app.
+#
+# A fresh clone does not need any of this: the fitted models in backend/models/
+# are committed, so the API and dashboard run with the trained pipeline straight
+# after `pip install -r requirements.txt`.
+#
+# Install with:  pip install -r requirements-training.txt
+
+# --- Wisesight corpus download (python train_chat_sentiment.py) ---
+huggingface_hub==1.31.0
+pyarrow==25.0.1          # reads the corpus's parquet splits
+
+# --- WangchanBERTa fine-tuning (python train_transformer.py) ---
+# Large (~2.5 GB with torch). Only needed to reproduce the transformer
+# comparison; its metrics are committed so the tables stand without it.
+torch==2.14.0
+transformers==5.17.0
+sentencepiece==0.2.2
+protobuf==7.36.1         # transformers routes SentencePiece conversion through it
