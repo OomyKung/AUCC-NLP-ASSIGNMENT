@@ -157,6 +157,14 @@ The backend is not running, or is still starting. The page shows the exact
 command to run. If you have just edited a backend file, `--reload` restarts the
 worker and requests fail for a second or two — refresh.
 
+**Story thumbnails show as broken images**
+
+The dev server proxies `/media` to FastAPI alongside `/api`. Without that rule
+a frame request resolves against Vite, which answers every unknown path with
+`index.html` for SPA routing — so an `<img>` receives HTML and renders broken
+rather than 404ing somewhere you would notice. Already configured; listed here
+because the symptom points at the image and the cause is the proxy.
+
 **`http://127.0.0.1:5173` refused but `localhost:5173` works**
 
 Fixed in this project (the dev server binds all interfaces), but if you see it
@@ -879,7 +887,7 @@ Frontend, from `frontend/`:
 ```powershell
 npm run dev        # dev server
 npm run build      # production build
-npm run test       # 13 rendering tests
+npm run test       # 16 rendering tests
 npx tsc -b --noEmit
 ```
 
@@ -1026,7 +1034,7 @@ failure, so the application never breaks without a key.
 
 ```powershell
 cd backend  && python -m pytest      # 293 tests
-cd frontend && npm run test          # 13 rendering tests
+cd frontend && npm run test          # 16 rendering tests
 ```
 
 Backend coverage includes Thai preprocessing and tokenisation, the YouTube

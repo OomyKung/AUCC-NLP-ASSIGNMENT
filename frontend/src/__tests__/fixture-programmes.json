@@ -1,0 +1,32 @@
+[
+ {
+  "video_id": "5wImdQJvZdw",
+  "title": "ถ่ายทอดสด เรื่องเล่าเช้านี้ วันที่ 4 กันยายน 2569",
+  "channel": "เรื่องเล่าเช้านี้",
+  "url": "https://www.youtube.com/watch?v=5wImdQJvZdw",
+  "transcript": {
+   "source": "youtube-asr:th-orig",
+   "language": "th",
+   "duration_ms": 8866892,
+   "cue_count": 3026,
+   "character_count": 87992
+  },
+  "segment_count": 36,
+  "segments": []
+ },
+ {
+  "video_id": "Gq9FLCg1yFo",
+  "title": "LIVE!! รายการ #คุยข่าวเช้าช่อง8 #เช้านี้ขยี้ข่าว วันที่ 4 กันยายน 2569 | ข่าวช่อง8",
+  "channel": "ข่าวช่อง8",
+  "url": "https://www.youtube.com/watch?v=Gq9FLCg1yFo",
+  "transcript": {
+   "source": "youtube-asr:th-orig",
+   "language": "th",
+   "duration_ms": 14959116,
+   "cue_count": 5575,
+   "character_count": 169297
+  },
+  "segment_count": 76,
+  "segments": []
+ }
+]

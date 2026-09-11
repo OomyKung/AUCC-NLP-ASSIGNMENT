@@ -18,6 +18,7 @@ import Analyze from '../pages/Analyze'
 import PipelinePage from '../pages/Pipeline'
 import { AboutPage } from '../pages/About'
 import EvaluationPage from '../pages/Evaluation'
+import TimelinePage from '../pages/Timeline'
 import AppLayout from '../layouts/AppLayout'
 import { fixtures } from './setup'
 
@@ -238,5 +239,54 @@ describe('API error handling', () => {
 
     await waitFor(() => expect(screen.getByText('เกิดข้อผิดพลาด')).toBeTruthy())
     expect(screen.getByText(/uvicorn app.main:app --reload/)).toBeTruthy()
+  })
+})
+
+describe('News Timeline', () => {
+  it('renders a story per detected segment with its deep link', async () => {
+    mount(<TimelinePage />, '/timeline')
+
+    const first = fixtures.programme.segments[0]
+    await waitFor(() => expect(screen.getByText(first.headline)).toBeTruthy())
+
+    // The link must point at the exact second, not the video start.
+    const links = screen
+      .getAllByRole('link')
+      .map((a) => a.getAttribute('href'))
+      .filter((h): h is string => !!h)
+    expect(links).toContain(first.youtube_url)
+    expect(first.youtube_url).toMatch(/&t=\d+s$/)
+  })
+
+  it('shows the captured frame, sized to the video rather than to the card', async () => {
+    mount(<TimelinePage />, '/timeline')
+
+    const first = fixtures.programme.segments[0]
+    await waitFor(() => expect(screen.getByText(first.headline)).toBeTruthy())
+
+    const image = screen.getAllByRole('img', { name: /ภาพจากคลิปที่/ })[0]
+    expect(image.getAttribute('src')).toBe(first.frame_url)
+
+    // The frames are 16:9. Fixed pixel heights left the image floating in a
+    // box stretched to the card, so the ratio is asserted rather than assumed.
+    const classes = image.getAttribute('class') ?? ''
+    expect(classes).toContain('aspect-video')
+    expect(classes).toContain('object-cover')
+    expect(classes).not.toMatch(/h-\[\d+px\]/)
+
+    // A flex item stretches to the row height unless told not to.
+    const anchor = image.closest('a')
+    expect(anchor?.getAttribute('class') ?? '').toContain('self-start')
+  })
+
+  it('says which signals produced each boundary', async () => {
+    mount(<TimelinePage />, '/timeline')
+
+    const first = fixtures.programme.segments[0]
+    await waitFor(() => expect(screen.getByText(first.headline)).toBeTruthy())
+
+    // Boundaries are inferred, so the page explains them instead of
+    // presenting a split as fact.
+    expect(screen.getAllByText(/แบ่งช่วงจาก/).length).toBeGreaterThan(0)
   })
 })

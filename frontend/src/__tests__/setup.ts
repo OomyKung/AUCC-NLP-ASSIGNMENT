@@ -18,6 +18,8 @@ import trend from './fixture-trend.json'
 import pipeline from './fixture-pipeline.json'
 import detail from './fixture-detail.json'
 import evaluation from './fixture-evaluation.json'
+import programmes from './fixture-programmes.json'
+import programme from './fixture-programme.json'
 
 export const fixtures = {
   statistics,
@@ -28,6 +30,8 @@ export const fixtures = {
   pipeline,
   detail,
   evaluation,
+  programmes,
+  programme,
 }
 
 /** Map a request path to its fixture. */
@@ -39,6 +43,10 @@ function resolve(path: string): unknown {
   if (path.startsWith('/api/sentiments')) return sentiments
   if (path.startsWith('/api/pipeline')) return pipeline
   if (path.startsWith('/api/evaluation')) return evaluation
+  if (/^\/api\/broadcast\/programmes\/.+/.test(path)) return programme
+  if (path.startsWith('/api/broadcast/programmes')) return programmes
+  if (path.startsWith('/api/broadcast/segments'))
+    return { total: programme.segments.length, limit: 100, offset: 0, items: programme.segments }
   if (path.startsWith('/api/streams')) return []
   if (path.startsWith('/api/ingest/snapshots')) return []
   if (/^\/api\/news\/\d+\/messages/.test(path)) return []

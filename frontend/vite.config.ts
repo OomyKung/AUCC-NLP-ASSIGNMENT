@@ -15,6 +15,14 @@ export default defineConfig({
     // reachable from a phone for real responsive testing.
     host: true,
     proxy: {
+      // Captured video frames are served by FastAPI from the data directory.
+      // Without this they resolve against the dev server, which answers every
+      // unknown path with index.html for SPA routing -- so an <img> receives
+      // HTML and renders as a broken image rather than a 404 anyone notices.
+      '/media': {
+        target: API_TARGET,
+        changeOrigin: true,
+      },
       // Proxy API calls to FastAPI so the browser sees a single origin in dev.
       '/api': {
         target: API_TARGET,

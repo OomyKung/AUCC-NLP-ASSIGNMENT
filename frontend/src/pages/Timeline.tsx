@@ -243,29 +243,31 @@ function SegmentCard({ segment }: { segment: NewsSegment }) {
       <div className="flex flex-col gap-4 p-4 sm:flex-row">
         {/* The captured frame doubles as the deep link: clicking the picture of
             the moment takes you to the moment. */}
+        {/* `self-start` matters: a flex item stretches to the row height by
+            default, which left the 16:9 frame floating in a tall empty box.
+            `aspect-video` matches the 1280x720 source exactly, so the image
+            fills its container at every width instead of being pinned to
+            hard-coded pixels. */}
         <a
           href={segment.youtube_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="group relative shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800"
-          style={{ width: 160 }}
+          className="group relative block w-full shrink-0 self-start overflow-hidden rounded-xl bg-slate-100 sm:w-48 dark:bg-slate-800"
           aria-label={`ดูคลิปที่ ${segment.timecode}`}
         >
           {segment.frame_url ? (
             <img
               src={segment.frame_url}
               alt={`ภาพจากคลิปที่ ${segment.timecode}`}
-              width={160}
-              height={90}
               loading="lazy"
-              className="block h-[90px] w-[160px] object-cover transition-transform group-hover:scale-105"
+              className="block aspect-video w-full object-cover transition-transform duration-200 group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-[90px] w-[160px] items-center justify-center text-xs text-slate-400">
+            <div className="flex aspect-video w-full items-center justify-center text-xs text-slate-400">
               ไม่มีภาพ
             </div>
           )}
-          <span className="absolute bottom-1 right-1 rounded bg-black/75 px-1.5 py-0.5 font-mono text-[11px] text-white tabular-nums">
+          <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded bg-black/75 px-1.5 py-0.5 font-mono text-[11px] text-white tabular-nums">
             {segment.timecode}
           </span>
         </a>
