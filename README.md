@@ -206,14 +206,14 @@ other model.
 |---|---|---|
 | **TF-IDF + logistic regression** | **0.727** | **0.725** |
 | Gazetteer (rules, no training) | 0.680 | 0.680 |
-| WangchanBERTa fine-tuned | 0.607 | 0.574 |
+| WangchanBERTa fine-tuned | 0.560 | 0.540 |
 
-TF-IDF beats the transformer by **+0.151 macro-F1 on sentiment** and **+0.152 on
-topic** — nearly the same margin on two independent tasks with very different
-class counts, which is what makes the result convincing rather than a fluke.
+TF-IDF beats the transformer by **+0.151 macro-F1 on sentiment** and **+0.185 on
+topic** — a large margin on two independent tasks with very different class
+counts, which is what makes the result convincing rather than a fluke.
 
 On topic classification a **hand-written word list beats a fine-tuned 110M-parameter
-language model** (0.680 vs 0.574).
+language model** (0.680 vs 0.540).
 
 It is not one unlucky run. Three sentiment settings were tried and all lost:
 
