@@ -34,7 +34,46 @@ Requirements: **Python 3.11+** (developed on 3.14) and **Node.js 20+**
 (developed on 24). No internet needed after install — the repository ships real
 collected chat and the trained models.
 
-### 1. Backend
+### One command
+
+```powershell
+.\run.cmd
+```
+
+That is the whole thing. It sets up anything missing, starts both servers, waits
+until each is actually answering, and opens the dashboard.
+
+On a **first run** it creates the virtualenv, installs both dependency sets and
+seeds the database (~3 minutes total). Afterwards it skips all of that and starts
+in about 10 seconds. The API and the dev server each get their own window so
+their logs stay readable; **Ctrl+C** in the launcher window stops both.
+
+| | |
+|---|---|
+| Dashboard | <http://localhost:5173> |
+| API | <http://127.0.0.1:8000> |
+| Interactive API docs | <http://127.0.0.1:8000/docs> |
+
+Options:
+
+```powershell
+.\run.cmd -Reset        # rebuild the database from the committed files first
+.\run.cmd -NoBrowser    # do not open a browser
+.\run.cmd -SkipInstall  # skip dependency checks when you know they are fine
+.\run.cmd -Quiet        # no extra windows; both logs in the current terminal
+```
+
+**Use `run.cmd`, not `run.ps1`.** Windows blocks `.ps1` files by default, so
+`.\run.ps1` fails with *"running scripts is disabled on this system"*. The `.cmd`
+wrapper passes `-ExecutionPolicy Bypass` for that single invocation, which
+changes no machine or user setting. If you have already loosened the policy
+yourself, `.\run.ps1` works identically and takes the same options.
+
+### Or run the two halves by hand
+
+Useful when you want to restart only one side, or watch one of them closely.
+
+**Terminal 1 — backend:**
 
 ```powershell
 cd backend
@@ -45,16 +84,11 @@ python seed.py
 uvicorn app.main:app --reload
 ```
 
-`seed.py` builds the database from committed files in about 40 seconds: 50
-sample articles plus 25,928 real Thai chat messages from six streams, analysed
-into 116 windows. It needs no network access.
+`seed.py` builds the database from committed files in about a minute: 50 sample
+articles plus 25,928 real Thai chat messages from six streams, analysed into 116
+windows. It needs no network access.
 
-Leave that terminal running. The API is now at <http://127.0.0.1:8000>, with
-interactive docs at <http://127.0.0.1:8000/docs>.
-
-### 2. Frontend
-
-In a **second** terminal:
+**Terminal 2 — frontend:**
 
 ```powershell
 cd frontend
@@ -62,9 +96,16 @@ npm install
 npm run dev
 ```
 
-### 3. Open the dashboard
+Then open **<http://localhost:5173>**.
 
-**<http://localhost:5173>**
+If `.venv\Scripts\activate` is blocked by the execution policy, call the
+interpreter directly instead — no policy change needed:
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe seed.py
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
 
 ---
 
@@ -521,7 +562,14 @@ The transformation is idempotent, so it is safe to run before every commit.
 
 ## Command reference
 
-All from `backend/` with the virtualenv active.
+From the project root:
+
+```powershell
+.\run.cmd                  # start everything (see Quick start)
+.\run.cmd -Reset           # rebuild the database first
+```
+
+Everything below is from `backend/` with the virtualenv active.
 
 ```powershell
 # Database
