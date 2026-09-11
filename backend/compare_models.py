@@ -46,6 +46,11 @@ OUTPUT = Path(__file__).resolve().parent / "models" / "model_comparison.json"
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
 
+# Filled in from the actual split, so the label cannot drift from the data the
+# transformer was fine-tuned on. It said "597 rows" for a while after the
+# dataset grew to 836.
+TRAIN_ROWS = 0
+
 # Hub models use their own label vocabularies.
 LABEL_ALIASES = {
     "pos": "positive",
@@ -107,8 +112,8 @@ def compare_sentiment(x_test: list[str], y_test: list[str]) -> dict:
         from app.nlp.backends.hf_transformer import HFSentimentBackend
 
         finetuned = HFSentimentBackend()
-        results["WangchanBERTa fine-tuned (597 rows)"] = score(
-            "WangchanBERTa fine-tuned (597 rows)",
+        results[f"WangchanBERTa fine-tuned ({TRAIN_ROWS} rows)"] = score(
+            f"WangchanBERTa fine-tuned ({TRAIN_ROWS} rows)",
             y_test,
             [p.label for p in finetuned.predict_many(x_test)],
         )
@@ -175,8 +180,8 @@ def compare_topic(x_test: list[str], y_test: list[str]) -> dict:
         from app.nlp.backends.hf_transformer import HFTopicBackend
 
         finetuned = HFTopicBackend()
-        results["WangchanBERTa fine-tuned (597 rows)"] = score(
-            "WangchanBERTa fine-tuned (597 rows)",
+        results[f"WangchanBERTa fine-tuned ({TRAIN_ROWS} rows)"] = score(
+            f"WangchanBERTa fine-tuned ({TRAIN_ROWS} rows)",
             y_test,
             [p.label for p in finetuned.predict_many(x_test)],
         )
@@ -222,8 +227,13 @@ def main() -> int:
             random_state=RANDOM_STATE,
             stratify=labels,
         )
+        global TRAIN_ROWS
+        TRAIN_ROWS = len(_x_train)
         if task == "sentiment":
-            print(f"held-out rows: {len(x_test)}  (seed {RANDOM_STATE}, stratified)")
+            print(
+                f"held-out rows: {len(x_test)}  train rows: {TRAIN_ROWS}  "
+                f"(seed {RANDOM_STATE}, stratified)"
+            )
 
         results = comparator(x_test, y_test)
         classes = len(set(labels))
@@ -233,7 +243,7 @@ def main() -> int:
             ranked = sorted(results.items(), key=lambda kv: -kv[1]["f1_macro"])
             best_name, best = ranked[0]
             print(f"\n  best: {best_name} (macro-F1 {best['f1_macro']:.4f})")
-            transformer = results.get("WangchanBERTa fine-tuned (597 rows)")
+            transformer = results.get(f"WangchanBERTa fine-tuned ({TRAIN_ROWS} rows)")
             classical = results.get("TF-IDF + logistic regression")
             if transformer and classical:
                 gap = classical["f1_macro"] - transformer["f1_macro"]

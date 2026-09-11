@@ -1,15 +1,15 @@
 {
   "topic": {
     "class_weights": true,
-    "accuracy": 0.56,
-    "f1_macro": 0.5397644324669048,
-    "f1_weighted": 0.5397644324669048,
+    "accuracy": 0.5952380952380952,
+    "f1_macro": 0.5764536088877278,
+    "f1_weighted": 0.5743570094862428,
     "model": "airesearch/wangchanberta-base-att-spm-uncased",
     "epochs": 3,
     "batch_size": 8,
     "learning_rate": 2e-05,
-    "fit_seconds": 391.6,
-    "trained_at": "2026-09-11T05:15:17.444038+00:00",
+    "fit_seconds": 485.2,
+    "trained_at": "2026-09-11T07:47:20.641841+00:00",
     "labels": [
       "accident",
       "crime",
@@ -26,6 +26,23 @@
       "international",
       "business",
       "other"
+    ]
+  },
+  "sentiment": {
+    "class_weights": true,
+    "accuracy": 0.7440476190476191,
+    "f1_macro": 0.7128953571906592,
+    "f1_weighted": 0.7373366486501673,
+    "model": "airesearch/wangchanberta-base-att-spm-uncased",
+    "epochs": 3,
+    "batch_size": 8,
+    "learning_rate": 2e-05,
+    "fit_seconds": 474.2,
+    "trained_at": "2026-09-11T07:55:27.443761+00:00",
+    "labels": [
+      "positive",
+      "neutral",
+      "negative"
     ]
   }
 }

@@ -5,141 +5,140 @@
   },
   "tasks": {
     "sentiment": {
-      "held_out_rows": 150,
+      "held_out_rows": 168,
       "classes": 3,
       "true_distribution": {
-        "negative": 50,
-        "neutral": 31,
-        "positive": 69
+        "negative": 54,
+        "neutral": 41,
+        "positive": 73
       },
       "models": {
         "lexicon (rules, no training)": {
-          "accuracy": 0.4266666666666667,
-          "f1_macro": 0.4224996555050296,
+          "accuracy": 0.6190476190476191,
+          "f1_macro": 0.6149577717879604,
           "distinct_predicted": 3,
           "predicted_distribution": {
-            "negative": 32,
-            "neutral": 69,
-            "positive": 49
+            "negative": 51,
+            "neutral": 65,
+            "positive": 52
           }
         },
         "TF-IDF + logistic regression": {
-          "accuracy": 0.74,
-          "f1_macro": 0.6819093695382356,
+          "accuracy": 0.7619047619047619,
+          "f1_macro": 0.7433493030437633,
           "distinct_predicted": 3,
           "predicted_distribution": {
-            "negative": 47,
-            "neutral": 24,
-            "positive": 79
+            "negative": 49,
+            "neutral": 39,
+            "positive": 80
           }
         },
-        "WangchanBERTa fine-tuned (597 rows)": {
-          "accuracy": 0.5466666666666666,
-          "f1_macro": 0.5311157552536863,
+        "WangchanBERTa fine-tuned (668 rows)": {
+          "accuracy": 0.7440476190476191,
+          "f1_macro": 0.7128953571906592,
           "distinct_predicted": 3,
           "predicted_distribution": {
-            "negative": 71,
-            "neutral": 32,
-            "positive": 47
+            "negative": 63,
+            "neutral": 29,
+            "positive": 76
           }
         },
         "off-the-shelf: wangchan-sentiment-thai-text-model": {
-          "accuracy": 0.25333333333333335,
-          "f1_macro": 0.19972632731253423,
-          "distinct_predicted": 3,
+          "accuracy": 0.26785714285714285,
+          "f1_macro": 0.1793103448275862,
+          "distinct_predicted": 2,
           "predicted_distribution": {
-            "negative": 6,
-            "neutral": 143,
-            "positive": 1
+            "negative": 4,
+            "neutral": 164
           }
         }
       }
     },
     "topic": {
-      "held_out_rows": 150,
+      "held_out_rows": 168,
       "classes": 15,
       "true_distribution": {
         "accident": 10,
-        "business": 10,
+        "business": 13,
         "crime": 10,
         "disaster": 10,
-        "economy": 10,
-        "education": 10,
-        "entertainment": 10,
-        "environment": 10,
-        "health": 10,
-        "international": 10,
+        "economy": 12,
+        "education": 12,
+        "entertainment": 11,
+        "environment": 12,
+        "health": 12,
+        "international": 11,
         "other": 10,
-        "politics": 10,
-        "society": 10,
+        "politics": 11,
+        "society": 12,
         "sports": 10,
-        "technology": 10
+        "technology": 12
       },
       "models": {
         "gazetteer (rules, no training)": {
-          "accuracy": 0.68,
-          "f1_macro": 0.6799837114670876,
+          "accuracy": 0.6190476190476191,
+          "f1_macro": 0.6325569231922711,
           "distinct_predicted": 15,
           "predicted_distribution": {
             "accident": 12,
-            "business": 13,
+            "business": 15,
             "crime": 7,
-            "disaster": 13,
-            "economy": 8,
-            "education": 10,
-            "entertainment": 8,
-            "environment": 5,
-            "health": 12,
-            "international": 3,
+            "disaster": 8,
+            "economy": 10,
+            "education": 21,
+            "entertainment": 10,
+            "environment": 8,
+            "health": 11,
+            "international": 8,
             "other": 18,
-            "politics": 8,
-            "society": 14,
-            "sports": 7,
-            "technology": 12
+            "politics": 11,
+            "society": 12,
+            "sports": 9,
+            "technology": 8
           }
         },
         "TF-IDF + logistic regression": {
-          "accuracy": 0.7266666666666667,
-          "f1_macro": 0.7250708012317919,
+          "accuracy": 0.7083333333333334,
+          "f1_macro": 0.7109176591731537,
           "distinct_predicted": 15,
           "predicted_distribution": {
-            "accident": 16,
-            "business": 7,
-            "crime": 9,
-            "disaster": 14,
-            "economy": 12,
-            "education": 8,
-            "entertainment": 7,
-            "environment": 11,
-            "health": 12,
+            "accident": 15,
+            "business": 10,
+            "crime": 8,
+            "disaster": 8,
+            "economy": 17,
+            "education": 14,
+            "entertainment": 10,
+            "environment": 12,
+            "health": 11,
             "international": 12,
-            "other": 4,
-            "politics": 8,
-            "society": 9,
-            "sports": 10,
+            "other": 7,
+            "politics": 14,
+            "society": 10,
+            "sports": 9,
             "technology": 11
           }
         },
-        "WangchanBERTa fine-tuned (597 rows)": {
-          "accuracy": 0.56,
-          "f1_macro": 0.5397644324669048,
+        "WangchanBERTa fine-tuned (668 rows)": {
+          "accuracy": 0.5952380952380952,
+          "f1_macro": 0.5764536088877278,
           "distinct_predicted": 15,
           "predicted_distribution": {
-            "accident": 24,
-            "business": 17,
-            "crime": 7,
-            "disaster": 8,
-            "economy": 5,
-            "education": 17,
-            "entertainment": 11,
-            "environment": 13,
-            "health": 6,
+            "accident": 13,
+            "business": 22,
+            "crime": 11,
+            "disaster": 14,
+            "economy": 17,
+            "education": 18,
+            "entertainment": 8,
+            "environment": 12,
+            "health": 8,
             "international": 8,
             "other": 3,
-            "politics": 7,
-            "society": 4,
-            "sports": 10,
-            "technology": 10
+            "politics": 14,
+            "society": 5,
+            "sports": 11,
+            "technology": 4
           }
         }
       }

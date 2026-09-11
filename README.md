@@ -354,35 +354,51 @@ from **0.436 to 0.673 (+0.237)** on the same 2,614 rows — the largest single
 improvement in the project, and on the data path the dashboard is actually built
 around.
 
-### Does a transformer help? No, not at this data size
+### Does a transformer help? Not yet — but the gap is closing fast
 
 WangchanBERTa is the standard Thai pre-trained language model, and the character
-n-gram ablation suggested subword modelling should suit Thai. It was fine-tuned
-on the same 597 training rows and scored on the same 150 held-out rows as every
-other model.
+n-gram ablation suggested subword modelling should suit Thai. It was fine-tuned on
+the same 668 training rows and scored on the same 168 held-out rows as every other
+model here, so this is a like-for-like comparison.
 
 | Sentiment (3 classes) | Accuracy | Macro-F1 |
 |---|---|---|
-| **TF-IDF + logistic regression** | **0.753** | **0.698** |
-| WangchanBERTa fine-tuned | 0.547 | 0.531 |
-| Lexicon (rules, no training) | 0.427 | 0.422 |
-| Off-the-shelf Thai sentiment model | 0.253 | 0.200 |
+| **TF-IDF + calibrated LinearSVC** | **0.762** | **0.743** |
+| WangchanBERTa fine-tuned | 0.744 | 0.713 |
+| Lexicon (rules, no training) | 0.619 | 0.615 |
+| Off-the-shelf Thai sentiment model | 0.268 | 0.179 |
 
 | Topic (15 classes) | Accuracy | Macro-F1 |
 |---|---|---|
-| **Blend (TF-IDF + gazetteer)** | **0.767** | **0.763** |
-| TF-IDF + logistic regression | 0.727 | 0.725 |
-| Gazetteer (rules, no training) | 0.680 | 0.680 |
-| WangchanBERTa fine-tuned | 0.560 | 0.540 |
+| **TF-IDF + logistic regression** | **0.708** | **0.711** |
+| Gazetteer (rules, no training) | 0.619 | 0.633 |
+| WangchanBERTa fine-tuned | 0.595 | 0.577 |
 
-TF-IDF beats the transformer by **+0.167 macro-F1 on sentiment** and **+0.185 on
-topic** — a large margin on two independent tasks with very different class
-counts, which is what makes the result convincing rather than a fluke.
+TF-IDF still wins both, but **this result changed when the dataset grew, and the
+direction of the change is the interesting part.**
 
-On topic classification a **hand-written word list beats a fine-tuned 110M-parameter
-language model** (0.680 vs 0.540).
+| | 747-row dataset | 836-row dataset |
+|---|---|---|
+| Sentiment: transformer macro-F1 | 0.531 | **0.713** |
+| Sentiment: TF-IDF advantage | +0.167 | **+0.031** |
+| Topic: transformer macro-F1 | 0.540 | **0.577** |
+| Topic: TF-IDF advantage | +0.185 | +0.134 |
 
-It is not one unlucky run. Three sentiment settings were tried and all lost:
+Roughly 12% more training data moved the sentiment transformer by **+0.182
+macro-F1** and cut TF-IDF's advantage from a rout to 0.031 — within touching
+distance. TF-IDF gained far less from the same rows. That is the signature of a
+model that was **data-starved rather than unsuited**, and it revises the earlier
+conclusion in this README: the honest reading is no longer "transformers don't
+work for Thai here", it is "this dataset is still too small for one, and the
+crossover is probably not far away".
+
+On **topic** the picture is different and the gap stays wide. 15 classes over 668
+rows is ~45 examples each, and a **hand-written word list still beats a fine-tuned
+110M-parameter language model** (0.633 vs 0.577). Class count, not just row count,
+is what starves it.
+
+It is not one unlucky run. Three sentiment settings were tried on the smaller
+dataset and all lost badly:
 
 | Epochs | LR | Batch | Class weights | Macro-F1 |
 |---|---|---|---|---|
@@ -391,33 +407,33 @@ It is not one unlucky run. Three sentiment settings were tried and all lost:
 | 10 | 3e-5 | 16 | yes | 0.346 |
 
 Training *longer* made it worse: at 10 epochs the model collapsed to predicting
-`negative` for 121 of 150 rows. The failure is qualitative as well as numerical —
-the fine-tuned model calls "ทีมชาติไทยคว้าชัยชนะอย่างงดงาม" (*Thailand won
-gloriously*) **negative**, and "มีผู้เสียชีวิต 3 ราย" (*three people died*)
-**positive**.
+`negative` for 121 of 150 rows. On the smaller set the failure was qualitative
+too — it called "ทีมชาติไทยคว้าชัยชนะอย่างงดงาม" (*Thailand won gloriously*)
+**negative**. On 836 rows that kind of gross error is gone, which is consistent
+with the numbers above.
 
-**Why:** 597 examples is far too little to fine-tune a 110M-parameter model,
-whereas TF-IDF over character n-grams is well suited to exactly this regime. The
-practical lesson is that at this data size, more data would help more than a
-bigger model.
-
-The off-the-shelf model is a second, independent instance of the domain-mismatch
-result: trained on Wisesight social-media text, it predicts `neutral` for **143
-of 150** news rows. Comparing predicted distributions against the truth
-(69 positive / 31 neutral / 50 negative) makes each failure mode legible in a way
+The off-the-shelf model is a separate, independent instance of the
+domain-mismatch result, and it has not improved because nothing about it changed:
+trained on Wisesight social-media text, it predicts `neutral` for **164 of 168**
+news rows. Comparing predicted distributions against the truth
+(73 positive / 41 neutral / 54 negative) makes each failure mode legible in a way
 the headline metric does not:
 
 | Model | Predicted pos / neu / neg |
 |---|---|
-| TF-IDF | 79 / 24 / 47 — well calibrated |
-| WangchanBERTa fine-tuned | 47 / 32 / 71 |
-| Lexicon | 49 / 69 / 32 — over-predicts neutral |
-| Off-the-shelf | 1 / **143** / 6 — collapsed |
+| TF-IDF | 80 / 39 / 49 — well calibrated |
+| WangchanBERTa fine-tuned | 76 / 29 / 63 — under-predicts neutral |
+| Lexicon | 52 / 65 / 51 — over-predicts neutral |
+| Off-the-shelf | 0 / **164** / 4 — collapsed |
 
 Reproduce with `python train_transformer.py` then `python compare_models.py`.
 The transformer path needs `torch`, `transformers`, `sentencepiece` **and**
-`protobuf`; without protobuf, transformers routes WangchanBERTa's SentencePiece
-vocabulary to a TikToken converter and fails with a misleading error.
+`protobuf` (`pip install -r requirements-training.txt`); without protobuf,
+transformers routes WangchanBERTa's SentencePiece vocabulary to a TikToken
+converter and fails with a misleading error. Fine-tuning both tasks takes about
+20 minutes on CPU; `MAX_LENGTH` is 64 because the longest document is 51 subword
+tokens and padding to 256 exhausted RAM on the first attempt (attention is
+O(n²) in sequence length).
 
 ### Ablations
 
@@ -756,20 +772,26 @@ To switch backends, change one line in `.env`:
 ```ini
 NLP_TOKENIZER=newmm                    # newmm | newmm-safe | longest | mm
 NLP_TOPIC_BACKEND=blend                # sklearn | blend | transformer
-NLP_SENTIMENT_BACKEND=sklearn          # sklearn | blend | lexicon | transformer
+NLP_SENTIMENT_BACKEND=blend            # sklearn | blend | lexicon | transformer
 NLP_CHAT_SENTIMENT_BACKEND=wisesight   # wisesight | sklearn | lexicon | transformer
 NLP_SUMMARIZER_BACKEND=extractive      # extractive | llm
 NLP_NER_BACKEND=rules                  # rules | pythainlp
 
 # Blend weights, fitted by ensemble.py on out-of-fold training predictions.
-NLP_TOPIC_BLEND_ALPHA=0.85             # 1.0 = trained model alone, 0.0 = rules alone
-NLP_SENTIMENT_BLEND_ALPHA=1.0          # fitted to 1.0: the lexicon adds nothing here
+NLP_TOPIC_BLEND_ALPHA=0.90             # 1.0 = trained model alone, 0.0 = rules alone
+NLP_SENTIMENT_BLEND_ALPHA=0.85         # re-fit with `python ensemble.py` after retraining
 ```
 
 The values above are the defaults, and each is the measured choice rather than a
-preference — see [Results](#results). `blend` is the default for topic because it
-wins; it is *not* the default for sentiment because the fitted weight came out at
-1.0, making it identical to `sklearn` with an extra moving part.
+preference — see [Results](#results). Both tasks blend because both win on
+cross-validation.
+
+Sentiment is worth a note: on the 747-row dataset its weight fitted to exactly
+**1.00**, meaning the lexicon contributed nothing and the blend was pure overhead,
+so the default was plain `sklearn`. After the dataset grew and the base model
+became a calibrated LinearSVC, the same procedure fits 0.85. The weight is
+re-measured after every retrain rather than assumed, which is why it lives in
+config instead of being hard-coded.
 
 To add a new model: write one adapter class satisfying the relevant Protocol,
 register it in `registry.py`, and select it in `.env`. Then
@@ -812,10 +834,16 @@ Not installed by default, since it adds roughly 2.5 GB. The adapter is written
 and lazily imported:
 
 ```powershell
-pip install torch transformers
+pip install -r requirements-training.txt
+python train_transformer.py
 # then in .env
 NLP_SENTIMENT_BACKEND=transformer
 ```
+
+It is not the default because it loses to TF-IDF on this dataset (sentiment
+macro-F1 0.713 vs 0.743; topic 0.577 vs 0.711) — but the sentiment gap narrowed
+from 0.167 to 0.031 when the dataset grew by 12%, so the adapter is here ready for
+the point where that crosses over.
 
 ### Optional: LLM summarisation
 
@@ -879,9 +907,11 @@ Stated plainly rather than hidden:
 - **Exhaustive hyperparameter search buys very little.** A 144-point grid moved
   topic by ~0.000 on the smaller dataset and by +0.012 on the larger one. When
   tuning cannot move a model, the limit is the data, not the configuration. The
-  transformer result points the same way: a 110M-parameter pre-trained Thai model
-  scored *worse* than TF-IDF on both tasks, which is what happens when there is
-  too little data to fine-tune on.
+  transformer result now says this more sharply than anything else here: 12% more
+  training rows moved fine-tuned WangchanBERTa by +0.182 macro-F1 on sentiment,
+  against a much smaller gain for TF-IDF, cutting TF-IDF's lead from 0.167 to
+  0.031. A model that responds that strongly to a small amount of data is
+  data-starved, and more data is the lever.
 - **`economy` and `business` still confuse each other** (F1 0.600 and 0.583).
   Targeted rows written around what distinguishes them helped — `business` rose
   from 0.500 and `technology` from 0.571 — but their vocabulary genuinely
