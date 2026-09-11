@@ -19,7 +19,7 @@ from app.models.analysis import NLPAnalysis
 from app.models.chat import ChatMessage, ChatStream
 from app.models.news import NewsArticle, SourceType
 from app.nlp.keyword_extractor import TfidfKeywordExtractor
-from app.nlp.preprocessing import is_noise
+from app.nlp.preprocessing import clean_text, is_noise
 from app.services.collectors.base import RawChatMessage
 from app.services.pipeline import NLPPipeline, get_pipeline
 from app.services.windowing import build_windows, synthesise_title
@@ -139,7 +139,13 @@ def fit_keyword_idf(db: Session, pipeline: NLPPipeline) -> int:
         )
         usable = [_to_raw(m) for m in messages if not is_noise(m.text)]
         for window in build_windows(usable):
-            documents.append(tokenizer.tokenize(window.as_document()))
+            # clean_text first, matching the per-document analysis path.
+            # Without it the IDF is fitted over a different token
+            # distribution than the one extraction sees, and URLs, emoji
+            # and @mentions enter the cached vocabulary.
+            documents.append(
+                tokenizer.tokenize(clean_text(window.as_document()))
+            )
 
     if not documents:
         return 0

@@ -29,6 +29,33 @@ MIN_TERM_LENGTH = 2
 TITLE_BOOST = 1.6
 
 
+def keyword_candidates(tokens: list[str]) -> list[str]:
+    """The terms that are allowed to become keywords.
+
+    Used by **both** ``fit`` and ``extract``. They previously applied different
+    filters -- ``fit`` ran only ``filter_tokens`` while ``extract`` additionally
+    required a Thai character and a minimum length -- so the cached IDF held
+    terms that extraction could never select. That had two consequences:
+
+    * the published ``keyword_idf.json`` accumulated junk it could not use,
+      including YouTube handles out of chat text, URLs and emoji-glued
+      fragments. Handles are personal data, so this leaked them into a public
+      file even though no keyword ever surfaced one.
+    * the vocabulary was a superset of the usable one, which is not what a
+      comment claiming "same filtering as extract()" implies.
+
+    ``protect_polarity=False`` on purpose: negators and intensifiers are
+    protected during sentiment analysis, where dropping ไม่ would invert the
+    result, but they are function words with no topical value -- leaving them in
+    made ไม่ the single most frequent "keyword" in the corpus.
+    """
+    return [
+        token
+        for token in filter_tokens(tokens, protect_polarity=False)
+        if len(token) >= MIN_TERM_LENGTH and THAI_CHARS.search(token)
+    ]
+
+
 class TfidfKeywordExtractor:
     """Rank a document's terms by TF-IDF."""
 
@@ -52,8 +79,9 @@ class TfidfKeywordExtractor:
         """Learn document frequencies from tokenised documents."""
         frequencies: Counter[str] = Counter()
         for tokens in documents:
-            # Same filtering as extract(), or the IDF keys will not match.
-            frequencies.update(set(filter_tokens(tokens, protect_polarity=False)))
+            # Shared with extract(), so the IDF keys always match the terms
+            # extraction can actually select.
+            frequencies.update(set(keyword_candidates(tokens)))
         self.document_frequencies = dict(frequencies)
         self.document_count = len(documents)
         return self
@@ -124,16 +152,7 @@ class TfidfKeywordExtractor:
 
             tokens = get_tokenizer().tokenize(text or "")
 
-        # protect_polarity=False here on purpose. Negators and intensifiers are
-        # protected during sentiment analysis, where dropping ไม่ would invert
-        # the result -- but they are function words with no topical value, and
-        # leaving them in made ไม่ the single most frequent "keyword" in the
-        # corpus. Keywords want content words only.
-        candidates = [
-            token
-            for token in filter_tokens(tokens, protect_polarity=False)
-            if len(token) >= MIN_TERM_LENGTH and THAI_CHARS.search(token)
-        ]
+        candidates = keyword_candidates(tokens)
         if not candidates:
             return []
 

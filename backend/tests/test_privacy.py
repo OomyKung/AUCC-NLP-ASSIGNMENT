@@ -138,6 +138,9 @@ def test_mention_substitution_leaves_no_trace_after_cleaning():
     from app.nlp.tokenizer import get_tokenizer
 
     tokenizer = get_tokenizer()
+    # Synthetic handles throughout this module on purpose: using a real one
+    # from the corpus would put an identifiable account back into the
+    # repository, which is the thing these tests exist to prevent.
     original = "@not_a_real_handle ฟรีครับ ไม่ต้องจ่าย"
     rewritten, found = convert_text(original)
 
@@ -192,3 +195,53 @@ def test_text_without_an_at_sign_is_returned_unchanged():
 def test_none_and_empty_text_are_handled():
     assert convert_text(None) == (None, set())
     assert convert_text("") == ("", set())
+
+
+# --------------------------------------------------------------------------
+# Derived artefacts
+# --------------------------------------------------------------------------
+
+
+def test_keyword_idf_vocabulary_carries_no_handles():
+    """The cached IDF is committed, so its vocabulary is published too.
+
+    It leaked 38 YouTube handles before ``fit`` and ``extract`` were made to
+    share one candidate filter: ``fit`` kept every token ``filter_tokens``
+    allowed, while ``extract`` additionally required a Thai character, so the
+    cached vocabulary held terms extraction could never select -- handles among
+    them.
+    """
+    from app.nlp.keyword_extractor import TfidfKeywordExtractor
+
+    extractor = TfidfKeywordExtractor.load()
+    if not extractor.is_fitted:
+        pytest.skip("no cached IDF; run python seed.py")
+
+    offenders = [term for term in extractor.document_frequencies if "@" in term]
+    assert not offenders, f"handles in the cached IDF vocabulary: {offenders[:10]}"
+
+
+def test_fit_and_extract_agree_on_candidates():
+    """Every IDF key must be a term extraction could actually select.
+
+    This is the invariant whose absence caused the leak, so it is asserted
+    directly rather than left to a comment.
+    """
+    from app.nlp.keyword_extractor import keyword_candidates
+
+    tokens = [
+        "@somebody",
+        "https://example.com",
+        "ก",
+        "รถยนต์",
+        "อุบัติเหตุ",
+        "555",
+        "ครับ",
+    ]
+    candidates = keyword_candidates(tokens)
+
+    assert "รถยนต์" in candidates
+    assert "อุบัติเหตุ" in candidates
+    # Non-Thai, too short, or pure filler must not survive.
+    for rejected in ["@somebody", "https://example.com", "ก", "555", "ครับ"]:
+        assert rejected not in candidates, rejected

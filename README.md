@@ -465,12 +465,13 @@ replaces every one with a stable keyed hash (blake2s, 4-byte digest — short
 enough to read, long enough that the expected collision count across 5,706
 handles is ~0.004, because a collision would merge two speakers).
 
-Handles appear in **two** places, and the second is the one that is easy to miss:
+Handles appear in **three** places, and only the first is obvious:
 
 | Location | Example | Becomes |
 |---|---|---|
 | `author` field | `@thairathnews` | `ผู้ชม #3b9ebd90` |
 | `@mention` inside message text | `@thairathnews ครับ` | `@viewer-3b9ebd90 ครับ` |
+| a term in the cached keyword IDF | `@thairathnews` | dropped from the vocabulary |
 
 An earlier version of the script handled only the author field, which left 98
 raw handles inside message text — viewers replying to each other by name. Both
@@ -486,10 +487,19 @@ Two properties worth stating precisely:
   *same* regex removes it completely — verified to produce identical cleaned text
   and identical tokens. A Thai pseudonym would not work here: `\w` stops at Thai
   combining marks and would leave fragments like `ชม` to pollute keywords.
+- **The derived artefacts matter too.** `models/keyword_idf.json` is committed,
+  so its vocabulary is published as well — and it had accumulated 38 handles.
+  The cause was a mismatch: `fit` kept every token `filter_tokens` allowed, while
+  `extract` additionally required a Thai character, so the cached vocabulary held
+  terms extraction could never select. They now share one `keyword_candidates`
+  filter, which removed 1,250 junk terms (handles, URLs, emoji fragments) and
+  took the vocabulary from 8,806 to 7,556. No keyword output changed — the Thai
+  requirement already prevented a handle from surfacing.
 - **It is enforced, not just documented.** `tests/test_privacy.py` scans the
-  committed snapshots for raw handles, emails and phone-shaped digit runs, and
-  fails the build if any appear. The digit check requires four distinct digits in
-  a run, because `5555555555` is Thai laughter, not a phone number.
+  committed snapshots for raw handles, emails and phone-shaped digit runs, checks
+  the IDF vocabulary, and asserts the `fit`/`extract` invariant directly. The
+  digit check requires four distinct digits in a run, because `5555555555` is
+  Thai laughter, not a phone number.
 
 ```powershell
 python anonymise.py --check     # report what would change
@@ -682,7 +692,7 @@ failure, so the application never breaks without a key.
 ## Testing
 
 ```powershell
-cd backend  && python -m pytest      # 242 tests
+cd backend  && python -m pytest      # 244 tests
 cd frontend && npm run test          # 13 rendering tests
 ```
 
