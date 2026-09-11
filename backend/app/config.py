@@ -116,6 +116,29 @@ class Settings(BaseSettings):
     segment_min_seconds: int = 60
     segment_block_seconds: int = 30
 
+    # Where a story's still frame comes from.
+    #   ffmpeg     : a real 1280x720 frame from the video stream, on which the
+    #                burnt-in story banner and clock are readable. ~5s each.
+    #                The binary ships with imageio-ffmpeg, so no manual install.
+    #   storyboard : a 320x180 tile from YouTube's scrubbing sprite sheets.
+    #                ~0.1s each, and the automatic fallback when ffmpeg or the
+    #                stream is unavailable.
+    frame_backend: Literal["ffmpeg", "storyboard"] = "ffmpeg"
+    frame_height: int = 720
+
+    # Top-down splitting of spans whose halves classify as different topics.
+    # OFF because it was measured and it made things worse. It uses the topic
+    # classifier as its criterion, and the classifier is the unreliable part
+    # here -- on 40 seconds of out-of-domain broadcast speech it wobbles, so
+    # splitting on its disagreement fragments coherent stories. One five-minute
+    # report on a shot monkey became four segments with two wrong labels, where
+    # refinement alone kept it as a single, correctly-labelled `crime` story.
+    #
+    # It does improve the "halves disagree" rate (43% vs 54%), but that metric
+    # rewards fragmentation, which is precisely the failure -- a reminder that a
+    # proxy measured with a noisy instrument can move the wrong way.
+    segment_split_mixed: bool = False
+
     # Optional Hugging Face models (only loaded when a transformer backend is on).
     hf_topic_model: str = "airesearch/wangchanberta-base-att-spm-uncased"
     hf_sentiment_model: str = "phoner45/wangchan-sentiment-thai-text-model"

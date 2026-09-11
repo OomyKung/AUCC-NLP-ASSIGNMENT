@@ -237,56 +237,55 @@ throughout, because the classifier wobbled on 30 seconds of speech. Two fixes:
 Together these took the programme from 112 fragments to **80 stories**, median
 2.5 minutes, and rejoined the monkey report into one five-minute segment.
 
+#### Pinning down *when* the topic changes
+
+Block-level detection can only place a boundary on the 30-second grid it
+searches, so a transition at 12:47 was reported as 12:30 — and worse, the block
+holding the switch was a *mixture* of two stories, which muddies both its
+classification and the text either side inherits. Measured: **0 of 129 boundaries
+sat off the grid**.
+
+A second stage now moves each boundary onto the cue where the change actually
+happens, using evidence the coarse pass is too blunt to use:
+
+| Snap to | Why | Used |
+|---|---|---|
+| **Music cut** | Thai news puts a sting between items; the story starts when it ends | 13 |
+| **Speaker change** | far too frequent to *propose* boundaries (1,531 per programme), which is exactly what makes it good for *snapping* — one or two per 30s window | 80 |
+| **Lexical cut** | the cue where vocabulary either side differs most | 18 |
+
+Result: **110 of 112 boundaries now land off the grid**, median shift 7.4s.
+
+A third idea was tried and **rejected on measurement**: splitting any span whose
+two halves classify as different topics. It improves the "halves disagree" rate
+(54% → 43%) and makes the result worse. The criterion is the topic classifier,
+and the classifier is the unreliable part here — on 40 seconds of out-of-domain
+speech it wobbles, so splitting on its disagreement fragments coherent stories.
+One five-minute report became four segments with two wrong labels, where
+refinement alone kept it as a single, correctly-labelled `crime` story. The proxy
+rewarded fragmentation, which was the failure. It is kept behind
+`SEGMENT_SPLIT_MIXED=true` so the measurement can be reproduced.
+
 #### Capturing the frame
 
-`ffmpeg` is not a dependency. YouTube already publishes **storyboards** — the
-sprite sheets its player shows when you scrub — and for this programme the finest
-track is a 3×3 grid of 320×180 tiles per sheet across 167 sheets, i.e. **a real
-frame from the video every ~10 seconds**, finer than the story boundaries.
+Frames come straight from the video at **1280×720**, on which the burnt-in story
+banner, the on-air clock and the channel badge are all readable.
 
-So "capture the screen at 12:30" is: find the sheet and tile covering 12:30, fetch
-that one sheet, crop the tile. No video download, no ffmpeg, a few kilobytes per
-frame. The trade-off is resolution: 320×180 is right for a timeline card and too
-small to read on-screen text. `capture_frame()` is the single place to swap in a
-full-resolution implementation if ffmpeg is ever available.
+ffmpeg is not assumed to be on PATH — it is not, on a normal Windows machine, and
+asking someone to install it by hand is a setup step that will fail.
+`imageio-ffmpeg` ships the binary as an ordinary wheel, so `pip install` is the
+whole install.
 
-#### Writing a headline for each story
+What makes it affordable is the seek: `-ss` placed *before* `-i` makes ffmpeg jump
+to the timestamp using HTTP byte ranges instead of decoding from the start, so a
+frame four hours into a stream costs about five seconds and a few hundred
+kilobytes rather than a multi-gigabyte download.
 
-Joining a story's top keywords produced titles like
-`ติดตาม · นิติ · ศุกร์ · เช้านี้` — four disconnected words describing nothing.
-Each story now gets a real phrase pulled out of what was actually said:
-
-| Before | After |
-|---|---|
-| `ผู้ก่อเหตุ · ครอบครัว · หญิง · เกิดเหตุ` | `เห็นผู้ก่อเหตุขับกระบะเข้าออกซอยหลายรอบแล้วไปจอดดักซุ่ม` |
-| `เจ้าภาพ · คว้าแชมป์ · ตะเกียง · ตั๋ว` | `กิตติพงษ์รัชตะเกียงไกรนำนักกีฬาเข้าพบนายกรัฐมนตรี` |
-| `เครื่องจักร · ฝุ่น · ทำความสะอาด · ถัง` | `จุดเกิดเหตุเป็นเครื่องจักรสำหรับขัดทรายแล้วก็ถังดูดฝุ่น` |
-
-There is no headline in the source to find, and sentence segmentation does not
-help: on unpunctuated ASR speech `crfcut` returns run-on blocks of 700+
-characters next to fragments of 2. So the headline is the most
-**information-dense span** of real speech — every 7–20 token window scored on IDF
-mass, overlap with the story's own keywords, and penalties for filler and bare
-digits, then trimmed so it cannot open or close on a dangling particle.
-
-Two fixes came from output that was visibly broken:
-
-- **Offsets are located, not accumulated.** The tokeniser drops whitespace, so
-  cumulative token lengths drift and slices began mid-word (`้วันศุกร์`).
-- **Spans prefer starting on a transcript cue.** A cue is a real unit of speech;
-  without that anchor a span opens on a fragment of a split name
-  (`พงษ์รัชตะเกียงไกร`), because Thai has no spaces and the tokeniser splits
-  inside names as readily as between words.
-
-Keywords did not disappear — they moved onto the card as chips, where they are
-information rather than a pretend title.
-
-**Honest limit:** quality is bounded by the transcript. ASR mangles names
-(`ชาญวีรกูล` → `ชาวรกูล`) and a rambling presenter gives nothing dense to
-extract, so roughly two thirds of stories get a genuinely descriptive headline
-and the rest are on-topic but clumsy. Setting `LLM_API_KEY` is the route to a
-generated headline, which is markedly better; the seam already exists for the
-summariser.
+**Storyboards remain the fallback.** YouTube publishes sprite sheets of
+evenly-spaced frames — what its player shows when you scrub — giving a real frame
+every ~10 seconds at 320×180 for a few kilobytes. Used when ffmpeg is missing, the
+stream cannot be resolved, or `FRAME_BACKEND=storyboard` is set. Frames are cached
+and committed either way, so a rebuild needs no network.
 
 #### Jumping straight to the moment
 
@@ -693,7 +692,7 @@ thai-news-nlp/
 │   │       ├── entities.py          rule/gazetteer NER
 │   │       └── backends/            sklearn, gazetteer, lexicon, transformer
 │   ├── models/                      trained artefacts + metrics.json (committed)
-│   ├── tests/                       287 tests
+│   ├── tests/                       293 tests
 │   ├── build_dataset.py             merge + validate the labelled dataset
 │   ├── train.py                     train the classifiers
 │   ├── evaluate.py                  write models/metrics.json
@@ -1026,7 +1025,7 @@ failure, so the application never breaks without a key.
 ## Testing
 
 ```powershell
-cd backend  && python -m pytest      # 287 tests
+cd backend  && python -m pytest      # 293 tests
 cd frontend && npm run test          # 13 rendering tests
 ```
 

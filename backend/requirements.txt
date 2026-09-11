@@ -27,6 +27,7 @@ joblib==1.6.0
 yt-dlp==2026.8.19
 httpx==0.28.1
 pillow==12.3.0            # crops video frames out of YouTube storyboard sheets
+imageio-ffmpeg==0.6.0     # bundles the ffmpeg binary; no manual install needed
 
 # --- Testing ---
 pytest==9.1.1

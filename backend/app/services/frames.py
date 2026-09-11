@@ -1,26 +1,30 @@
 r"""Capture a still frame from the video at a given moment.
 
-Why storyboards rather than ffmpeg
-----------------------------------
-The obvious way to grab a frame is ``ffmpeg -ss <t> -i <stream> -frames:v 1``.
-That needs the ffmpeg binary, which is not installed here and is not a Python
-dependency anyone can ``pip install`` reliably on Windows, and it also means
-downloading part of a multi-gigabyte video stream for one thumbnail.
+Two sources, in order of quality
+--------------------------------
+**ffmpeg (default).** A real frame straight from the video stream, 1280x720, on
+which the on-screen text a news channel burns in -- the story banner, the clock,
+the channel badge -- is actually readable. ffmpeg is not assumed to be on PATH,
+because it is not on a normal Windows machine and asking a student to install it
+by hand is a setup step that will fail; ``imageio-ffmpeg`` ships the binary as an
+ordinary wheel, so ``pip install`` is the whole install.
 
-YouTube already publishes what is needed. Every video has **storyboards**: sprite
-sheets of evenly-spaced frames, which is what the player shows when you scrub the
-timeline. For a 249-minute programme the ``sb0`` track is a grid of 3x3 tiles at
-320x180 per sheet, 167 sheets, so there is a real frame from the video roughly
-every **10 seconds** -- finer than the story boundaries this project detects.
+What makes this affordable is the seek. ``-ss`` placed *before* ``-i`` makes
+ffmpeg jump to the timestamp using HTTP byte ranges instead of decoding from the
+start, so a frame four hours into a stream costs about five seconds and a few
+hundred kilobytes rather than a multi-gigabyte download.
 
-So a "screen capture at 12:30" is: work out which sheet and which tile covers
-12:30, fetch that one sheet (a few kilobytes), crop the tile, save it. No video
-download, no ffmpeg, and the frame is genuinely from the video at that moment.
+**Storyboards (fallback).** YouTube publishes sprite sheets of evenly-spaced
+frames -- what its player shows when you scrub the timeline. For a 249-minute
+programme the ``sb0`` track is a 3x3 grid of 320x180 tiles across 167 sheets, so
+there is a real frame every ~10 seconds for a few kilobytes each. Used when
+ffmpeg is unavailable, when the stream cannot be resolved, or when
+``FRAME_BACKEND=storyboard`` is set. 320x180 is fine for a timeline card and too
+small to read burnt-in text.
 
-The trade-off, stated plainly: 320x180 is thumbnail resolution. It is the right
-size for a timeline card and too small to read on-screen text. If ffmpeg is
-available, :func:`capture_frame` is the one place to swap in a full-resolution
-implementation -- everything else depends only on the returned path.
+Both produce a genuine frame from the video at that moment; they differ only in
+resolution and cost. Frames are cached on disk and committed, so a rebuild -- and
+a demo -- needs no network at all.
 """
 
 from __future__ import annotations
@@ -85,6 +89,104 @@ class StoryboardTrack:
         url, _duration = self.fragments[-1]
         last = self.tiles_per_sheet - 1
         return url, last // self.columns, last % self.columns
+
+
+# --------------------------------------------------------------- ffmpeg
+# Real frames, straight from the video stream.
+#
+# ffmpeg is not assumed to be on PATH -- it is not, on this machine, and asking
+# a student to install it by hand is a setup step that will fail. `imageio-ffmpeg`
+# ships the binary as an ordinary wheel, so `pip install` is the whole install.
+#
+# The seek is what makes this affordable: `-ss` placed BEFORE `-i` makes ffmpeg
+# jump to the timestamp using byte ranges over HTTP instead of decoding from the
+# start, so a frame four hours into a stream costs about five seconds and a few
+# hundred kilobytes rather than the whole video.
+
+
+def ffmpeg_executable() -> str | None:
+    """Path to a usable ffmpeg, or None when there is not one."""
+    import shutil
+
+    try:
+        import imageio_ffmpeg
+
+        path = imageio_ffmpeg.get_ffmpeg_exe()
+        if path and Path(path).is_file():
+            return path
+    except Exception:
+        pass
+    return shutil.which("ffmpeg")
+
+
+def stream_url(source: str, *, height: int = 720, timeout: int | None = None) -> str:
+    """Direct media URL for the video, at or below ``height``.
+
+    Signed and time-limited by YouTube, so it is resolved once per batch and
+    used immediately rather than stored.
+    """
+    video_id = extract_video_id(source)
+    command = [
+        sys.executable,
+        "-m",
+        "yt_dlp",
+        "--skip-download",
+        "--no-warnings",
+        "-f",
+        f"bestvideo[height<={height}][ext=mp4]/best[height<={height}]/best",
+        "--get-url",
+        watch_url(video_id),
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout or settings.ytdlp_timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise FrameUnavailable(f"Timed out resolving the stream for {video_id}.") from exc
+
+    url = (completed.stdout or "").strip().splitlines()
+    if not url or not url[0].startswith("http"):
+        raise FrameUnavailable(
+            f"Could not resolve a media stream for {video_id}: "
+            f"{(completed.stderr or '').strip()[:200]}"
+        )
+    return url[0]
+
+
+def capture_frame_ffmpeg(
+    url: str, second: int, target: Path, *, executable: str, timeout: int = 180
+) -> bool:
+    """Write one full-resolution frame. True on success."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    command = [
+        executable,
+        "-y",
+        "-loglevel",
+        "error",
+        # Before -i: seek by byte range instead of decoding from the start.
+        "-ss",
+        str(max(0, second)),
+        "-i",
+        url,
+        "-frames:v",
+        "1",
+        "-q:v",
+        "3",
+        str(target),
+    ]
+    try:
+        completed = subprocess.run(
+            command, capture_output=True, text=True, timeout=timeout, check=False
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return completed.returncode == 0 and target.is_file() and target.stat().st_size > 0
 
 
 def _frames_dir(video_id: str) -> Path:
@@ -220,12 +322,15 @@ def capture_frame(
     return target
 
 
-def capture_frames(source: str, seconds: list[int], *, overwrite: bool = False) -> dict[int, Path]:
-    """Capture several frames, reading the storyboard metadata once.
+def capture_frames(
+    source: str, seconds: list[int], *, overwrite: bool = False
+) -> dict[int, Path]:
+    """Capture several frames, doing the expensive setup once.
 
-    Sheets are fetched at most once each even when several requested timestamps
-    fall inside the same sheet, which they routinely do: sheets cover ~90s and
-    news stories run 1-5 minutes.
+    Tries ffmpeg first for full-resolution frames, and falls back to storyboard
+    tiles when ffmpeg is missing or the stream cannot be resolved. A partial
+    result is returned rather than an exception: a missing thumbnail makes a
+    timeline card plainer, it does not make the analysis wrong.
     """
     if not seconds:
         return {}
@@ -233,11 +338,11 @@ def capture_frames(source: str, seconds: list[int], *, overwrite: bool = False) 
     video_id = extract_video_id(source)
     wanted = sorted(set(seconds))
 
-    # Serve everything already on disk first, and only reach for the network if
-    # something is genuinely missing. Fetching storyboard metadata up front
-    # would make a fully-cached rebuild require a network connection, which
-    # defeats the point of caching the frames at all -- `seed.py` rebuilds the
-    # timelines from committed snapshots and must work with no connectivity.
+    # Serve what is already on disk first, and only reach for the network if
+    # something is genuinely missing. Resolving a stream or fetching storyboard
+    # metadata up front would make a fully-cached rebuild require connectivity,
+    # which defeats the point of caching at all -- seed.py rebuilds timelines
+    # from committed snapshots and must work offline.
     captured: dict[int, Path] = {}
     missing: list[int] = []
     for second in wanted:
@@ -250,11 +355,32 @@ def capture_frames(source: str, seconds: list[int], *, overwrite: bool = False) 
     if not missing:
         return captured
 
+    if settings.frame_backend == "ffmpeg":
+        executable = ffmpeg_executable()
+        if executable:
+            try:
+                url = stream_url(source, height=settings.frame_height)
+            except FrameUnavailable:
+                url = None
+            if url:
+                remaining: list[int] = []
+                for second in missing:
+                    target = frame_path(video_id, second)
+                    if capture_frame_ffmpeg(
+                        url, second, target, executable=executable
+                    ):
+                        captured[second] = target
+                    else:
+                        remaining.append(second)
+                missing = remaining
+
+    if not missing:
+        return captured
+
+    # Storyboard fallback for whatever ffmpeg could not produce.
     try:
         track = fetch_storyboards(source)[0]
     except FrameUnavailable:
-        # Offline, or no storyboards published. Whatever was cached still
-        # stands; the rest of the timeline simply has no thumbnails.
         return captured
 
     for second in missing:
@@ -263,8 +389,6 @@ def capture_frames(source: str, seconds: list[int], *, overwrite: bool = False) 
                 source, second, track=track, overwrite=overwrite
             )
         except FrameUnavailable:
-            # One unavailable frame must not abandon the rest; a missing
-            # thumbnail is a cosmetic loss, not a failed analysis.
             continue
     return captured
 

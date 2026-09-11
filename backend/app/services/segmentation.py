@@ -114,6 +114,9 @@ class Boundary:
     time_ms: int
     depth: float = 0.0
     reasons: list[str] = field(default_factory=list)
+    # How the exact time was pinned down once the coarse block was found:
+    # music-cut | speaker-cut | lexical-cut | grid.
+    refined_reason: str = "grid"
 
     @property
     def confidence(self) -> float:
@@ -367,6 +370,252 @@ def music_gap_indices(blocks: list[Block], *, threshold_ms: int = MUSIC_GAP_MS) 
     }
 
 
+# --------------------------------------------------- boundary refinement
+
+# How far either side of a coarse boundary to look for the real transition.
+# One block: the true cut is by construction within half a block of the grid
+# point that detected it.
+REFINE_SEARCH_MS = 30_000
+
+# Context compared either side of a candidate cut. Long enough to characterise
+# a story, short enough not to reach into the one before or after.
+REFINE_CONTEXT_MS = 45_000
+
+# Bonus applied when a candidate cut is also where the speaker changed.
+# Speaker changes are far too frequent to *propose* boundaries -- 1,531 in one
+# programme -- but that is exactly what makes them good for snapping: within a
+# 30-second window there are only one or two, and a new story almost always
+# begins with a new voice.
+SPEAKER_CHANGE_BONUS = 0.12
+
+
+def _cue_token_index(transcript: Transcript) -> list[list[str]]:
+    """Tokenise every cue once.
+
+    Refinement compares context either side of many candidate cuts, and the same
+    cue text falls in many of those contexts. Tokenising per candidate would
+    re-tokenise the same speech dozens of times.
+    """
+    from app.nlp.preprocessing import clean_text, filter_tokens
+    from app.nlp.tokenizer import get_tokenizer
+
+    tokenizer = get_tokenizer()
+    tokens: list[list[str]] = []
+    for cue in transcript.cues:
+        if cue.text and not cue.non_speech:
+            tokens.append(
+                filter_tokens(
+                    tokenizer.tokenize(clean_text(cue.text)), protect_polarity=False
+                )
+            )
+        else:
+            tokens.append([])
+    return tokens
+
+
+def refine_boundary(
+    transcript: Transcript,
+    cue_tokens: list[list[str]],
+    coarse_ms: int,
+    *,
+    search_ms: int = REFINE_SEARCH_MS,
+    context_ms: int = REFINE_CONTEXT_MS,
+) -> tuple[int, str]:
+    """Locate the real transition near a coarse, grid-aligned boundary.
+
+    Block-level detection can only place a boundary on a 30-second grid point,
+    so the reported time is out by up to 15 seconds and -- worse -- the block
+    holding the transition is a *mixture* of two stories, which muddies both its
+    classification and the text either segment gets. Measured before this
+    existed: 0 of 129 boundaries sat off the grid, and 73% of segments scored
+    under 0.35 topic confidence.
+
+    Returns ``(time_ms, reason)``.
+    """
+    low = max(0, coarse_ms - search_ms // 2)
+    high = coarse_ms + search_ms // 2
+
+    # A music sting inside the window *is* the transition: Thai news puts one
+    # between items, so the next story starts when it ends.
+    music = [
+        cue
+        for cue in transcript.cues
+        if cue.non_speech and low <= cue.start_ms <= high
+    ]
+    if music:
+        return music[-1].end_ms, "music-cut"
+
+    candidates = [
+        (index, cue)
+        for index, cue in enumerate(transcript.cues)
+        if cue.text and not cue.non_speech and low <= cue.start_ms <= high
+    ]
+    if len(candidates) < 2:
+        return coarse_ms, "grid"
+
+    def tokens_between(start_ms: int, end_ms: int) -> list[str]:
+        collected: list[str] = []
+        for index, cue in enumerate(transcript.cues):
+            if cue.start_ms >= end_ms:
+                break
+            if cue.end_ms > start_ms:
+                collected.extend(cue_tokens[index])
+        return collected
+
+    best_time, best_score, best_reason = coarse_ms, -math.inf, "grid"
+    for index, cue in candidates:
+        cut = cue.start_ms
+        before = _vector(tokens_between(cut - context_ms, cut))
+        after = _vector(tokens_between(cut, cut + context_ms))
+        if not before or not after:
+            continue
+
+        # The best cut is where the two sides share least vocabulary.
+        score = 1.0 - _cosine(before, after)
+        reason = "lexical-cut"
+        if cue.speaker_change:
+            score += SPEAKER_CHANGE_BONUS
+            reason = "speaker-cut"
+
+        if score > best_score:
+            best_score, best_time, best_reason = score, cut, reason
+
+    return best_time, best_reason
+
+
+# --------------------------------------------------- top-down mixed split
+
+# How deep the recursive split may go. Three levels turns one span into at most
+# eight, which is far more than a real news item needs.
+MAX_SPLIT_DEPTH = 3
+
+# Vocabulary dissimilarity a cut must reach before a span is split on topic
+# disagreement. 1.0 means the two sides share no terms at all; below this the
+# halves are still talking about the same thing and the classifier is wobbling.
+MIXED_SPLIT_MIN_DISSIMILARITY = 0.72
+
+
+def best_internal_cut(
+    transcript: Transcript,
+    cue_tokens: list[list[str]],
+    start_ms: int,
+    end_ms: int,
+    *,
+    minimum_ms: int,
+    context_ms: int = REFINE_CONTEXT_MS,
+) -> tuple[int | None, float]:
+    """Cue start inside ``(start_ms, end_ms)`` where vocabulary changes most.
+
+    Returns ``(cut_ms, dissimilarity)``. The score matters as much as the
+    position: a caller must be able to tell a real vocabulary break from the
+    best of a set of equally weak options.
+
+    Both resulting pieces must be at least ``minimum_ms`` long, so the search is
+    restricted rather than the result rejected afterwards.
+    """
+    low = start_ms + minimum_ms
+    high = end_ms - minimum_ms
+    if high <= low:
+        return None, 0.0
+
+    def tokens_between(begin: int, finish: int) -> list[str]:
+        collected: list[str] = []
+        for index, cue in enumerate(transcript.cues):
+            if cue.start_ms >= finish:
+                break
+            if cue.end_ms > begin:
+                collected.extend(cue_tokens[index])
+        return collected
+
+    best_cut, best_score = None, -math.inf
+    for cue in transcript.cues:
+        if not cue.text or cue.non_speech:
+            continue
+        if not (low <= cue.start_ms <= high):
+            continue
+        before = _vector(tokens_between(max(start_ms, cue.start_ms - context_ms), cue.start_ms))
+        after = _vector(tokens_between(cue.start_ms, min(end_ms, cue.start_ms + context_ms)))
+        if not before or not after:
+            continue
+        score = 1.0 - _cosine(before, after)
+        if cue.speaker_change:
+            score += SPEAKER_CHANGE_BONUS
+        if score > best_score:
+            best_score, best_cut = score, cue.start_ms
+    return best_cut, (best_score if best_cut is not None else 0.0)
+
+
+def split_mixed_spans(
+    transcript: Transcript,
+    cue_tokens: list[list[str]],
+    spans: list[tuple[int, int, "Boundary | None"]],
+    *,
+    minimum_ms: int,
+) -> list[tuple[int, int, "Boundary | None"]]:
+    """Split spans that still cover more than one story.
+
+    **Off by default** -- see ``settings.segment_split_mixed``. Kept because the
+    measurement is worth reproducing, not because it is used: it scores better
+    on the "halves disagree" proxy and worse on the thing that matters.
+
+    Bottom-up block detection finds boundaries where the *local* signal is
+    strong, and it misses transitions that are real but gradual. Measured on one
+    programme: after grid refinement, 54% of segments had first and second halves
+    that classified as different topics -- a 5.4-minute span reading health then
+    crime means no boundary was found there at all, which is what makes a
+    story's label look wrong.
+
+    So each span is tested top-down: classify its two halves, and if they
+    disagree, cut at the point of greatest vocabulary change and recurse. The
+    test and the fix use the same criterion the defect was measured with.
+    """
+    from app.nlp.registry import get_components
+
+    backend = get_components().topic
+
+    def halves_disagree(start_ms: int, end_ms: int) -> bool:
+        middle = (start_ms + end_ms) // 2
+        first = transcript.text_between(start_ms, middle)
+        second = transcript.text_between(middle, end_ms)
+        if len(first) < MIN_BLOCK_CHARS or len(second) < MIN_BLOCK_CHARS:
+            return False
+        return backend.predict(first).label != backend.predict(second).label
+
+    def recurse(start_ms, end_ms, boundary, depth):
+        if depth >= MAX_SPLIT_DEPTH or end_ms - start_ms < 2 * minimum_ms:
+            return [(start_ms, end_ms, boundary)]
+        if not halves_disagree(start_ms, end_ms):
+            return [(start_ms, end_ms, boundary)]
+
+        cut, strength = best_internal_cut(
+            transcript, cue_tokens, start_ms, end_ms, minimum_ms=minimum_ms
+        )
+        # Disagreeing halves are not enough on their own. The classifier is the
+        # unreliable part here -- it sees forty seconds of out-of-domain speech
+        # -- so splitting on its disagreement alone fragments coherent stories:
+        # one five-minute report on a shot monkey became four segments, two of
+        # them mislabelled, where before it had been correct as a single
+        # `crime` story. A split now also needs the vocabulary to actually
+        # change, the same veto applied to the label-change boundary signal.
+        if cut is None or strength < MIXED_SPLIT_MIN_DISSIMILARITY:
+            return [(start_ms, end_ms, boundary)]
+
+        made = Boundary(
+            block_index=-1,
+            time_ms=cut,
+            reasons=["mixed-topic"],
+            refined_reason="lexical-cut",
+        )
+        return recurse(start_ms, cut, boundary, depth + 1) + recurse(
+            cut, end_ms, made, depth + 1
+        )
+
+    result: list[tuple[int, int, Boundary | None]] = []
+    for start_ms, end_ms, boundary in spans:
+        result.extend(recurse(start_ms, end_ms, boundary, 0))
+    return result
+
+
 # ------------------------------------------------------------- combination
 
 
@@ -483,6 +732,7 @@ def segment_transcript(
     block_ms: int = BLOCK_MS,
     min_segment_ms: int | None = None,
     analyse: bool = True,
+    refine: bool = True,
 ) -> tuple[list[Segment], list[Boundary], list[Block]]:
     """Split ``transcript`` into stories and analyse each one.
 
@@ -499,18 +749,46 @@ def segment_transcript(
     classify_blocks(blocks)
     boundaries = detect_boundaries(blocks)
 
+    # Second stage: move each boundary off the 30-second grid onto the cue where
+    # the transition actually happens. Without this every boundary is quantised
+    # to a block edge, the block holding the switch is a mixture of two stories,
+    # and both the timestamp and the topic label suffer for it.
+    cue_tokens: list[list[str]] = []
+    if refine:
+        cue_tokens = _cue_token_index(transcript)
+        previous_ms = 0
+        for boundary in boundaries:
+            refined_ms, reason = refine_boundary(
+                transcript, cue_tokens, boundary.time_ms
+            )
+            # Refinement must not reorder boundaries or produce a negative span.
+            if refined_ms <= previous_ms:
+                refined_ms = boundary.time_ms
+                reason = "grid"
+            boundary.time_ms = refined_ms
+            boundary.refined_reason = reason
+            previous_ms = refined_ms
+
     # Turn boundaries into spans covering the whole programme.
-    cut_points = [0] + [b.block_index for b in boundaries]
-    by_index = {b.block_index: b for b in boundaries}
+    cut_times = [0] + [b.time_ms for b in boundaries]
+    by_time = {b.time_ms: b for b in boundaries}
 
     spans: list[tuple[int, int, Boundary | None]] = []
-    for position, cut in enumerate(cut_points):
-        start_ms = blocks[cut].start_ms
-        if position + 1 < len(cut_points):
-            end_ms = blocks[cut_points[position + 1]].start_ms
-        else:
-            end_ms = blocks[-1].end_ms
-        spans.append((start_ms, end_ms, by_index.get(cut)))
+    for position, cut in enumerate(cut_times):
+        end_ms = (
+            cut_times[position + 1]
+            if position + 1 < len(cut_times)
+            else blocks[-1].end_ms
+        )
+        spans.append((cut, end_ms, by_time.get(cut)))
+
+    # Top-down pass: bottom-up detection finds boundaries where the local
+    # signal is strong and misses gradual transitions, leaving spans that still
+    # cover two stories. Splitting those is what stops a label looking wrong.
+    if refine and settings.segment_split_mixed:
+        spans = split_mixed_spans(
+            transcript, cue_tokens, spans, minimum_ms=minimum
+        )
 
     spans = _merge_short(spans, minimum_ms=minimum)
 
@@ -527,7 +805,11 @@ def segment_transcript(
             text=text,
             cue_starts=transcript.cue_start_offsets(start_ms, end_ms),
             boundary_confidence=boundary.confidence if boundary else 1.0,
-            boundary_reasons=list(boundary.reasons) if boundary else ["programme-start"],
+            boundary_reasons=(
+                [*boundary.reasons, boundary.refined_reason]
+                if boundary
+                else ["programme-start"]
+            ),
         )
         segments.append(segment)
 

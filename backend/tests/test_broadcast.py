@@ -455,3 +455,129 @@ def test_segment_headline_falls_back_rather_than_being_blank():
     segment.keywords = ["ตำรวจ", "จับกุม"]
 
     assert synthesise_headline(segment)
+
+
+# --------------------------------------------------------------------------
+# Boundary refinement
+# --------------------------------------------------------------------------
+
+
+def _timed_transcript() -> Transcript:
+    """Two stories with a music sting between them at 60s."""
+    cues = [
+        TranscriptCue(0, 10_000, "ตำรวจจับกุมผู้ต้องหาคดียาเสพติด"),
+        TranscriptCue(10_000, 20_000, "ยึดของกลางมูลค่ากว่าสิบล้านบาท"),
+        TranscriptCue(20_000, 30_000, "เจ้าหน้าที่ขยายผลจับกุมเครือข่าย"),
+        TranscriptCue(30_000, 45_000, "ผู้ต้องหาให้การรับสารภาพกับตำรวจ"),
+        TranscriptCue(45_000, 58_000, "", non_speech=True),
+        TranscriptCue(58_000, 70_000, "ทีมชาติไทยชนะการแข่งขันฟุตบอล", speaker_change=True),
+        TranscriptCue(70_000, 80_000, "กองเชียร์ร่วมฉลองชัยชนะที่สนามกีฬา"),
+        TranscriptCue(80_000, 95_000, "นักฟุตบอลทีมชาติขอบคุณแฟนบอล"),
+    ]
+    return Transcript(
+        video_id="x", source="test", language="th", duration_ms=95_000, cues=cues
+    )
+
+
+def test_refinement_snaps_to_the_music_break():
+    """Thai news puts a sting between items, so the next story starts when it
+    ends. That is the most reliable cut available."""
+    from app.services.segmentation import _cue_token_index, refine_boundary
+
+    transcript = _timed_transcript()
+    tokens = _cue_token_index(transcript)
+
+    time_ms, reason = refine_boundary(transcript, tokens, 60_000)
+
+    assert reason == "music-cut"
+    assert time_ms == 58_000
+
+
+def test_refinement_moves_off_the_block_grid():
+    """The defect this fixes: every boundary landed on a 30s grid point, so the
+    reported time was out by up to 15s and the block holding the switch was a
+    mixture of two stories."""
+    from app.services.segmentation import _cue_token_index, refine_boundary
+
+    transcript = _timed_transcript()
+    # Remove the music cue so refinement has to use lexical evidence.
+    transcript.cues = [c for c in transcript.cues if not c.non_speech]
+    tokens = _cue_token_index(transcript)
+
+    time_ms, reason = refine_boundary(transcript, tokens, 60_000)
+
+    assert reason in {"lexical-cut", "speaker-cut"}
+    assert time_ms % 30_000 != 0
+
+
+def test_refinement_falls_back_to_the_grid_when_there_is_nothing_to_use():
+    from app.services.segmentation import refine_boundary
+
+    empty = Transcript(video_id="x", source="test", language="th", cues=[])
+
+    assert refine_boundary(empty, [], 60_000) == (60_000, "grid")
+
+
+def test_mixed_span_is_split_where_the_vocabulary_changes():
+    """Bottom-up detection misses gradual transitions, leaving one span across
+    two stories -- measured at 54% of segments before this existed."""
+    from app.services.segmentation import _cue_token_index, best_internal_cut
+
+    transcript = _timed_transcript()
+    tokens = _cue_token_index(transcript)
+
+    cut, strength = best_internal_cut(
+        transcript, tokens, 0, 95_000, minimum_ms=20_000
+    )
+
+    assert cut is not None
+    # The two stories share no vocabulary, so the cut must be a strong one.
+    assert strength > 0.7
+    # The real change is at the football story; the cut must be near it, not
+    # in the middle of either story.
+    assert 45_000 <= cut <= 80_000
+
+
+def test_internal_cut_respects_the_minimum_segment_length():
+    """Both halves must survive the minimum, so the search is restricted rather
+    than the result rejected afterwards."""
+    from app.services.segmentation import _cue_token_index, best_internal_cut
+
+    transcript = _timed_transcript()
+    tokens = _cue_token_index(transcript)
+
+    cut, _strength = best_internal_cut(
+        transcript, tokens, 0, 95_000, minimum_ms=60_000
+    )
+    assert cut is None
+
+
+def test_topic_disagreement_alone_does_not_split_a_coherent_story():
+    """The regression this veto exists for.
+
+    Splitting on classifier disagreement alone fragmented coherent stories,
+    because the classifier is the unreliable part -- it sees forty seconds of
+    out-of-domain speech. One five-minute report became four segments, two of
+    them mislabelled, where it had been correct as a single story.
+    """
+    from app.services.segmentation import (
+        MIXED_SPLIT_MIN_DISSIMILARITY,
+        _cue_token_index,
+        best_internal_cut,
+    )
+
+    # One story throughout: the vocabulary never changes.
+    cues = [
+        TranscriptCue(i * 10_000, (i + 1) * 10_000, "ตำรวจจับกุมผู้ต้องหายาเสพติดของกลาง")
+        for i in range(10)
+    ]
+    transcript = Transcript(
+        video_id="x", source="test", language="th", duration_ms=100_000, cues=cues
+    )
+    tokens = _cue_token_index(transcript)
+
+    _cut, strength = best_internal_cut(
+        transcript, tokens, 0, 100_000, minimum_ms=20_000
+    )
+
+    assert strength < MIXED_SPLIT_MIN_DISSIMILARITY
