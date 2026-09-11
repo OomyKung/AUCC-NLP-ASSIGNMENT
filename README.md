@@ -93,7 +93,7 @@ python seed.py
 uvicorn app.main:app --reload
 ```
 
-`seed.py` builds the database from committed files in about a minute: 50 sample
+`seed.py` builds the database from committed files in about 80 seconds: 50 sample
 articles plus 27,928 real Thai chat messages from seven streams, analysed into
 126 windows, and rebuilds the story timelines from the committed transcript
 snapshots. It needs no network access — verified by running the rebuild with
@@ -108,6 +108,7 @@ take the extractive headlines. Either way the seed prints which it did:
 
 ```
   5wImdQJvZdw     36 stories,  36 frames, 36 cached headlines
+  Gq9FLCg1yFo     76 stories,  76 frames, 75 cached headlines
 ```
 
 #### Analysing a video of your own
