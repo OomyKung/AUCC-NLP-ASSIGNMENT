@@ -150,6 +150,11 @@ class Segment:
     # Character offsets inside `text` where a transcript cue begins. Used to
     # start a headline on a real unit of speech rather than mid-name.
     cue_starts: set[int] = field(default_factory=set)
+    # Name spellings the LLM corrected, as (asr_form, corrected). Empty
+    # without LLM_API_KEY. Surfaced rather than applied silently: a
+    # correction is a claim, and the reader should be able to see it.
+    name_corrections: list[tuple[str, str]] = field(default_factory=list)
+    enriched_by: str = ""
 
     @property
     def duration_ms(self) -> int:
@@ -825,6 +830,7 @@ def analyse_segments(segments: list[Segment]) -> None:
     from app.nlp.stopwords import BROADCAST_FILLER
 
     pipeline = get_pipeline()
+    use_llm = settings.has_llm and settings.llm_enrich_segments
     for segment in segments:
         # Broadcast filler is excluded from keywords only. It is not in the
         # general stopword list because that list defines the trained models'
@@ -843,6 +849,9 @@ def analyse_segments(segments: list[Segment]) -> None:
         segment.summary = result.summary.text if result.summary else ""
         segment.entities = [entity.as_dict() for entity in result.entities]
         segment.headline = synthesise_headline(segment)
+
+        if use_llm:
+            _enrich_with_llm(segment)
 
 
 def synthesise_headline(segment: Segment, *, max_length: int = 120) -> str:
@@ -877,3 +886,29 @@ def synthesise_headline(segment: Segment, *, max_length: int = 120) -> str:
     if len(headline) > max_length:
         headline = headline[: max_length - 1].rstrip() + "…"
     return headline or f"ช่วง {segment.timecode}"
+
+
+def _enrich_with_llm(segment: Segment) -> None:
+    """Replace the headline and entities with LLM-corrected ones.
+
+    Only reachable with ``LLM_API_KEY`` set. Every failure leaves the extractive
+    result in place: a clumsier headline is a far better outcome than a story
+    that fails to appear.
+    """
+    from app.nlp.llm_enrich import LLMUnavailable, apply_corrections, enrich_segment
+
+    try:
+        enrichment = enrich_segment(segment.text)
+    except LLMUnavailable:
+        return
+
+    if enrichment.headline:
+        segment.headline = enrichment.headline
+    if enrichment.entities:
+        segment.entities = enrichment.entities
+    if enrichment.corrections:
+        segment.name_corrections = enrichment.corrections
+        # The summary is shown beside the headline, so a name corrected in one
+        # and not the other would read as two different people.
+        segment.summary = apply_corrections(segment.summary, enrichment.corrections)
+    segment.enriched_by = "llm"

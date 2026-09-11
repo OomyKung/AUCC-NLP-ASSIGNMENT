@@ -66,6 +66,8 @@ def _to_out(segment: NewsSegment) -> SegmentOut:
         transcript_text_preview=_preview(segment.transcript_text),
         boundary_reasons=list(segment.boundary_reasons or []),
         boundary_confidence=segment.boundary_confidence,
+        name_corrections=[list(pair) for pair in (segment.name_corrections or [])],
+        enriched_by=segment.enriched_by or "",
         youtube_url=segment.youtube_url,
         # Frames are served by the static mount in main.py; the stored value is
         # relative to the data directory so it survives a move or a fresh clone.

@@ -295,6 +295,41 @@ every ~10 seconds at 320×180 for a few kilobytes. Used when ffmpeg is missing, 
 stream cannot be resolved, or `FRAME_BACKEND=storyboard` is set. Frames are cached
 and committed either way, so a rebuild needs no network.
 
+#### Thai names, and the limits of ASR
+
+YouTube's speech recognition transcribes Thai names phonetically and gets them
+wrong: **ศศิภาพร จันทวิสูตร** comes out as **สักสิภาพรจันทวิสูตร**. No amount of
+NER fixes that — NER locates spans, it does not correct spelling — so a
+correction needs an outside reference. Four were measured before reaching for a
+model:
+
+| Approach | Why it fails here |
+|---|---|
+| PyThaiNLP Thai soundex (lk82, udom83, metasound) | `ศศิภาพร`/`สักสิภาพร` match on **none** of the three — the ASR *inserts a syllable*, changing the consonant code they encode |
+| PyThaiNLP name corpora (22k names) | contain neither `ศศิภาพร` nor `จันทวิสูตร`; there is nothing to match against |
+| Cross-reference the chat and transcript | works *sometimes* — `จันทวิสูตร` and `รัชตะเกียงไกร` do appear correctly elsewhere in the same transcript, but `ศศิภาพร` never does |
+| Switch NER to the PyThaiNLP CRF model | better *spans* (it captures `คุณสาธิตวงษ์หนองเตย` whole instead of truncating) but the characters are still the ASR's |
+
+Knowing which Thai names exist, and which one a phonetic approximation was
+reaching for, is world knowledge. So **`LLM_API_KEY` enables name repair**: one
+call per story returns a corrected entity list and a written headline, and the
+ASR form is stored beside the correction rather than replaced silently, because
+a correction is a claim a reader should be able to check. Without a key the
+pipeline behaves exactly as before, so nothing here is load-bearing for a fresh
+clone or an offline demo.
+
+**What was fixable locally was fixed.** The rule-based extractor had defects of
+its own, independent of the ASR, and removing 275 spurious entities needed no
+model at all:
+
+| Defect | Before | After |
+|---|---|---|
+| `คุณผู้ชม…` read as a person — `คุณ` is a personal title, so the presenter addressing the audience became an entity | 146 | **0** |
+| `เลย` read as the province Loei, when it is far more often the everyday word "at all" | 102 | **0** |
+| Verbs welded onto names (`นายทรงพลขับ`) and single-character names (`นางสาวน`) | — | filtered |
+
+Total entities 1,268 → 990, PERSON 535 → 372.
+
 #### Jumping straight to the moment
 
 Every story carries `https://www.youtube.com/watch?v=<id>&t=<seconds>s`, aimed two
@@ -700,7 +735,7 @@ thai-news-nlp/
 │   │       ├── entities.py          rule/gazetteer NER
 │   │       └── backends/            sklearn, gazetteer, lexicon, transformer
 │   ├── models/                      trained artefacts + metrics.json (committed)
-│   ├── tests/                       293 tests
+│   ├── tests/                       302 tests
 │   ├── build_dataset.py             merge + validate the labelled dataset
 │   ├── train.py                     train the classifiers
 │   ├── evaluate.py                  write models/metrics.json
@@ -1033,7 +1068,7 @@ failure, so the application never breaks without a key.
 ## Testing
 
 ```powershell
-cd backend  && python -m pytest      # 293 tests
+cd backend  && python -m pytest      # 302 tests
 cd frontend && npm run test          # 16 rendering tests
 ```
 

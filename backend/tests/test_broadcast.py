@@ -581,3 +581,122 @@ def test_topic_disagreement_alone_does_not_split_a_coherent_story():
     )
 
     assert strength < MIXED_SPLIT_MIN_DISSIMILARITY
+
+
+# --------------------------------------------------------------------------
+# ASR name repair
+# --------------------------------------------------------------------------
+
+
+def test_llm_is_inert_without_a_key():
+    """Nothing here may be load-bearing: a fresh clone has no LLM_API_KEY and
+    must still produce a full timeline."""
+    from app.nlp.llm_enrich import LLMUnavailable, enrich_segment
+
+    with pytest.raises(LLMUnavailable, match="LLM_API_KEY"):
+        enrich_segment("ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก")
+
+
+def test_parses_a_fenced_json_completion():
+    """Models wrap JSON in code fences given half a chance."""
+    from app.nlp.llm_enrich import _parse
+
+    result = _parse(
+        '```json\n{"headline": "นักกีฬาเข้าพบนายกรัฐมนตรี", '
+        '"entities": [{"text": "ศศิภาพร จันทวิสูตร", "label": "PERSON", '
+        '"asr": "สักสิภาพรจันทวิสูตร"}]}\n```'
+    )
+
+    assert result.headline == "นักกีฬาเข้าพบนายกรัฐมนตรี"
+    assert result.entities == [{"text": "ศศิภาพร จันทวิสูตร", "label": "PERSON"}]
+    assert result.corrections == [("สักสิภาพรจันทวิสูตร", "ศศิภาพร จันทวิสูตร")]
+
+
+def test_a_name_left_unchanged_is_not_recorded_as_a_correction():
+    """The prompt tells the model to keep the ASR form when unsure; that is not
+    a correction and must not be presented as one."""
+    from app.nlp.llm_enrich import _parse
+
+    result = _parse(
+        '{"headline": "ข่าว", "entities": '
+        '[{"text": "สมชาย", "label": "PERSON", "asr": "สมชาย"}]}'
+    )
+
+    assert result.entities
+    assert result.corrections == []
+
+
+def test_rejects_entities_that_are_not_thai_or_not_a_known_type():
+    from app.nlp.llm_enrich import _parse
+
+    result = _parse(
+        '{"headline": "ข่าว", "entities": ['
+        '{"text": "PERSON", "label": "PERSON"},'
+        '{"text": "กรุงเทพ", "label": "CITY"},'
+        '{"text": "ตำรวจ", "label": "ORGANIZATION"}]}'
+    )
+
+    assert result.entities == [{"text": "ตำรวจ", "label": "ORGANIZATION"}]
+
+
+def test_malformed_completion_raises_rather_than_returning_junk():
+    from app.nlp.llm_enrich import LLMUnavailable, _parse
+
+    with pytest.raises(LLMUnavailable):
+        _parse("I'm sorry, I can't help with that.")
+
+
+def test_corrections_apply_longest_first():
+    """A short form must not pre-empt the longer one that contains it."""
+    from app.nlp.llm_enrich import apply_corrections
+
+    text = "สักสิภาพรจันทวิสูตรลงแข่ง"
+    fixed = apply_corrections(
+        text, [("สักสิ", "ศศิ"), ("สักสิภาพรจันทวิสูตร", "ศศิภาพร จันทวิสูตร")]
+    )
+
+    assert fixed == "ศศิภาพร จันทวิสูตรลงแข่ง"
+
+
+# --------------------------------------------------------------------------
+# Rule-based NER on broadcast speech
+# --------------------------------------------------------------------------
+
+
+def test_presenter_addressing_the_audience_is_not_a_person():
+    """"คุณผู้ชม" produced 146 spurious PERSON entities across one programme --
+    more than any real name -- because "คุณ" is a personal title."""
+    from app.nlp.entities import RuleEntityRecognizer
+
+    found = RuleEntityRecognizer().extract(
+        "สวัสดีครับคุณผู้ชมวันนี้นายสมชายแถลงข่าว"
+    )
+    people = [e.text for e in found if e.label == "PERSON"]
+
+    assert not any("ผู้ชม" in name for name in people)
+    assert any("สมชาย" in name for name in people)
+
+
+def test_a_verb_is_not_part_of_a_name():
+    from app.nlp.entities import RuleEntityRecognizer
+
+    found = RuleEntityRecognizer().extract("นายทรงพล ขับรถออกจากบ้าน")
+    people = [e.text for e in found if e.label == "PERSON"]
+
+    assert people
+    assert all("ขับ" not in name for name in people)
+
+
+def test_ambiguous_province_needs_a_location_prefix():
+    """เลย is the province Loei and also the everyday word "at all". Without a
+    prefix requirement it produced 102 false LOCATION hits -- more than every
+    real province combined."""
+    from app.nlp.entities import RuleEntityRecognizer
+
+    recogniser = RuleEntityRecognizer()
+
+    particle = recogniser.extract("เขาไม่มาเลยนะครับวันนี้")
+    assert not any(e.text == "เลย" for e in particle if e.label == "LOCATION")
+
+    place = recogniser.extract("เกิดเหตุที่จังหวัดเลยเมื่อคืนนี้")
+    assert any(e.label == "LOCATION" for e in place)

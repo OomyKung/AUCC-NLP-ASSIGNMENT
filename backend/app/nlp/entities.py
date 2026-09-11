@@ -54,7 +54,30 @@ _NAME_STOP_WORDS: frozenset[str] = frozenset(
         "ทำให้", "ทันที", "และ", "หรือ", "แต่", "ที่", "ซึ่ง", "โดย", "จาก", "ใน",
         "ระบุ", "เผย", "กล่าว", "แจ้ง", "พร้อม", "หลัง", "เมื่อ", "ว่า", "เป็น",
         "มี", "ได้", "ให้", "ไป", "มา", "แล้ว", "ยัง", "จะ", "ก็", "ๆ",
+        # Verbs that ran into names on broadcast transcripts, producing
+        # "นายทรงพลขับ" (a name welded to "drive") and similar.
+        "ขับ", "เข้า", "ออก", "ถูก", "พา", "นำ", "ขอ", "ทำ", "เดิน", "วิ่ง",
+        "ขึ้น", "ลง", "อยู่", "ต้อง", "เคย", "กำลัง", "เลย", "ด้วย", "กับ",
+        "เจอ", "พบ", "รับ", "ส่ง", "บอก", "ถาม", "ตอบ", "คิด", "รู้",
     }
+)
+
+# "คุณผู้ชม" is a presenter addressing the audience, not a person in the news.
+# It produced 39 spurious PERSON entities in one programme -- more than any
+# real name -- because "คุณ" is a personal title and the extractor took
+# whatever followed it.
+_NOT_A_PERSON: frozenset[str] = frozenset(
+    {"ผู้ชม", "ผู้ฟัง", "ผู้อ่าน", "ท่าน", "ทุกท่าน", "ผู้ชมครับ", "ผู้ชมค่ะ"}
+)
+
+# A Thai given name is at least two characters; a single character after a
+# title is a tokenisation artefact ("นางสาวน").
+MIN_NAME_CHARS = 2
+
+# Province names that are also ordinary Thai words, so they need a prefix
+# before being read as places.
+_AMBIGUOUS_PROVINCES: frozenset[str] = frozenset(
+    {"เลย", "ตาก", "น่าน", "แพร่", "ตรัง", "ระนอง"}
 )
 
 LOCATION_PREFIXES: tuple[str, ...] = (
@@ -97,18 +120,26 @@ class RuleEntityRecognizer:
         for index, token in enumerate(tokens):
             if token not in PERSON_TITLES:
                 continue
+            # "คุณผู้ชม" is the presenter addressing the audience.
+            following = tokens[index + 1] if index + 1 < len(tokens) else ""
+            if following in _NOT_A_PERSON:
+                continue
+
             parts: list[str] = []
             for candidate in tokens[index + 1 : index + 3]:
                 # Stop at punctuation, digits or another title.
                 if candidate in PERSON_TITLES or candidate.isdigit():
                     break
-                if candidate in _NAME_STOP_WORDS:
+                if candidate in _NAME_STOP_WORDS or candidate in _NOT_A_PERSON:
                     break
                 if not re.search(r"[^\W\d_]", candidate, re.UNICODE):
                     break
                 parts.append(candidate)
-            if parts:
-                found.append(token + "".join(parts))
+
+            name = "".join(parts)
+            # A single character after a title is a tokenisation artefact.
+            if len(name) >= MIN_NAME_CHARS:
+                found.append(token + name)
         return found
 
     @staticmethod
@@ -163,10 +194,20 @@ class RuleEntityRecognizer:
         for place in self._prefixed(tokens, LOCATION_PREFIXES):
             collected.append((place, "LOCATION"))
 
-        # Provinces are unambiguous, so match them directly.
-        for token in tokens:
-            if token in PROVINCES:
-                collected.append((token, "LOCATION"))
+        # Most province names are unambiguous, so match them directly.
+        for index, token in enumerate(tokens):
+            if token not in PROVINCES:
+                continue
+            # A handful are also everyday words: เลย ("at all"), ตาก ("to
+            # dry"), น่าน, แพร่ ("to spread"). Accept those only when a
+            # location prefix precedes them, or the particle sense floods the
+            # results -- "เลย" alone produced more LOCATION hits than every
+            # real province combined.
+            if token in _AMBIGUOUS_PROVINCES:
+                previous = tokens[index - 1] if index else ""
+                if previous not in LOCATION_PREFIXES:
+                    continue
+            collected.append((token, "LOCATION"))
 
         for pattern, label in (
             (_DATE, "DATE"),

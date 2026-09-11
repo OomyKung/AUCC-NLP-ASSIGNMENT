@@ -38,6 +38,11 @@ class SegmentOut(BaseModel):
     boundary_reasons: list[str] = []
     boundary_confidence: float = 0.0
 
+    # ASR name spellings that were corrected, as [asr_form, corrected] pairs,
+    # so the page can show the correction instead of applying it invisibly.
+    name_corrections: list[list[str]] = []
+    enriched_by: str = ""
+
     youtube_url: str = Field(description="Deep link to the moment this story starts")
     frame_url: str | None = Field(
         default=None, description="Captured video frame at that moment"

@@ -152,6 +152,15 @@ class Settings(BaseSettings):
     llm_model: str = "claude-sonnet-5"
     llm_base_url: str = "https://api.anthropic.com/v1/messages"
 
+    # Use the LLM to repair ASR-mangled Thai names and write story headlines.
+    # Inert without LLM_API_KEY. It exists because every local approach was
+    # measured and could not do it: Thai soundex does not match the manglings
+    # (the ASR inserts syllables), PyThaiNLP's 22k name corpora do not contain
+    # the names, and cross-referencing the chat and transcript only works when
+    # the ASR happened to get it right somewhere else -- which for
+    # "ศศิภาพร จันทวิสูตร" it never does. See app/nlp/llm_enrich.py.
+    llm_enrich_segments: bool = True
+
     # -------------------------------------------------- keyword extraction
     keyword_min_count: int = 5
     keyword_max_count: int = 10

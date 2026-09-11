@@ -184,6 +184,8 @@ def store_segments(
                 keywords=list(segment.keywords),
                 entities=list(segment.entities),
                 boundary_reasons=list(segment.boundary_reasons),
+                name_corrections=[list(pair) for pair in segment.name_corrections],
+                enriched_by=segment.enriched_by,
                 boundary_confidence=segment.boundary_confidence,
                 youtube_url=segment.youtube_url(stream.video_id),
                 frame_path=_relative_frame_path(frame) if frame else None,
