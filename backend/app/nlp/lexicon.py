@@ -99,6 +99,7 @@ POSITIVE_WORDS: dict[str, float] = {
     "หวัง": 0.35,
     "โชคดี": 0.7,
     "เอาใจช่วย": 0.7,
+    "เก่งมาก": 0.9,  # 24 occurrences; the positive side had far fewer gaps
     "555": 0.35,  # Thai laughter
 }
 
@@ -122,6 +123,38 @@ NEGATIVE_WORDS: dict[str, float] = {
     "ไม่ไหว": -0.65,
     "ไม่โอเค": -0.7,
     "รับไม่ได้": -0.8,
+    # Contemptuous register.
+    #
+    # This is how Thai news chat criticises, and it was a blind spot in both
+    # halves of the chat classifier: none of these words appear in this lexicon,
+    # and "อัปรีย์" appears *zero* times in Wisesight's 21,628 training rows
+    # (ไอ้หนู likewise; ตกต่ำ once). A model cannot learn a word it has never
+    # seen, which is why "ตัวอัปรีย์ ห้อยของอัปรีย์" was scored neutral at 0.84 --
+    # and why no tokeniser fixes it. Counts below are occurrences in the 24,284
+    # collected chat messages, so this is a measured gap rather than a guess.
+    "ทุเรศ": -0.85,  # 78
+    "ขี้โกง": -0.85,  # 31
+    "หน้าด้าน": -0.8,  # 27
+    "สันดาน": -0.75,  # 15
+    "เฮงซวย": -0.85,  # 13
+    "ตอแหล": -0.85,  # 11
+    "ตกต่ำ": -0.6,  # 7
+    "ระยำ": -0.95,  # 6
+    "สมน้ำหน้า": -0.7,  # 4
+    "บัดซบ": -0.85,  # 2
+    "สิ้นคิด": -0.7,  # 2
+    "อัปรีย์": -0.9,  # 1, and the message this whole entry came from
+    "ไร้ยางอาย": -0.9,  # 1
+    "เสื่อมเสีย": -0.7,  # 1
+    "ชั่วช้า": -0.9,  # 1
+    "น่าสมเพช": -0.8,  # 1
+    "น่าขยะแขยง": -0.85,  # 1
+    "เลวร้าย": -0.85,  # 1
+    "น่ารังเกียจ": -0.85,  # 1
+    # Absent from the collected chat, but the same register and unambiguous.
+    "จัญไร": -0.9,
+    "หน้าไหว้หลังหลอก": -0.85,
+    "ชิงชัง": -0.8,
     # Emotions
     "เสียใจ": -0.8,
     "ผิดหวัง": -0.8,

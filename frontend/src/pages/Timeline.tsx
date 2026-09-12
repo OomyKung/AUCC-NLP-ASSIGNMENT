@@ -20,11 +20,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ErrorState, LoadingState } from '../components/ui'
 import { notify, useAsync } from '../hooks'
+import { isUnclear } from '../lib/sentiment'
 import { ApiError, api } from '../services/api'
-import type { HeadlineJob, NewsSegment, Programme } from '../types'
+import type {
+  EnrichmentJob,
+  NewsSegment,
+  Programme,
+  Reaction,
+  SegmentReaction,
+  TimelineView,
+} from '../types'
 
-/** How often to ask a running headline job how it is getting on. */
+/** How often to ask a running enrichment job how it is getting on. */
 const POLL_MS = 4000
+
+/**
+ * The two halves of a broadcast, and the switch between them.
+ *
+ * A news programme is two recordings of the same hour: what the newsreader
+ * said, and what the audience said back. They share a clock, so every story can
+ * show either — or both, which is where the interesting disagreements are.
+ */
+const VIEWS: { value: TimelineView; label: string; hint: string }[] = [
+  { value: 'reporter', label: 'ผู้ประกาศ', hint: 'เนื้อข่าวจากเสียงพูดในคลิป' },
+  { value: 'viewers', label: 'ผู้ชม', hint: 'ความเห็นในแชทช่วงเวลาเดียวกัน' },
+  { value: 'both', label: 'ทั้งคู่', hint: 'เทียบข่าวกับความเห็นผู้ชม' },
+]
 
 /** How each boundary signal is explained to a reader, in Thai. */
 const REASON_LABEL: Record<string, string> = {
@@ -44,6 +65,7 @@ function minutes(ms: number): string {
 export default function TimelinePage() {
   const programmes = useAsync(() => api.programmes(), [])
   const [videoId, setVideoId] = useState<string | null>(null)
+  const [view, setView] = useState<TimelineView>('reporter')
 
   const selected = videoId ?? programmes.data?.[0]?.video_id ?? null
   const programme = useAsync(
@@ -86,12 +108,24 @@ export default function TimelinePage() {
         />
       )}
 
+      <ViewSwitch
+        view={view}
+        onChange={setView}
+        chatSegments={
+          list.find((item) => item.video_id === selected)?.chat_segments ?? 0
+        }
+      />
+
       {programme.error ? (
         <ErrorState message={programme.error} onRetry={programme.reload} />
       ) : programme.loading && !programme.data ? (
         <LoadingState rows={4} />
       ) : programme.data ? (
-        <ProgrammeTimeline programme={programme.data} onHeadlines={refresh} />
+        <ProgrammeTimeline
+          programme={programme.data}
+          view={view}
+          onEnriched={refresh}
+        />
       ) : null}
     </div>
   )
@@ -150,18 +184,96 @@ function ProgrammePicker({
   )
 }
 
+/**
+ * Switches the timeline between the newsreader and the audience.
+ *
+ * Both are already stored and already aligned -- chat carries the offset from
+ * the start of the stream, and so does every story -- so this is a filter, not
+ * a second analysis. Disabled with an explanation when the programme has no
+ * chat, which is most of them: news channels turn chat replay off after a
+ * broadcast, and an enabled control that does nothing is worse than an honest
+ * disabled one.
+ */
+function ViewSwitch({
+  view,
+  onChange,
+  chatSegments,
+}: {
+  view: TimelineView
+  onChange: (view: TimelineView) => void
+  chatSegments: number
+}) {
+  const hasChat = chatSegments > 0
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <div
+        className="flex rounded-xl border border-slate-200 p-0.5 dark:border-slate-700"
+        role="group"
+        aria-label="เลือกมุมมอง"
+      >
+        {VIEWS.map((option) => {
+          const disabled = !hasChat && option.value !== 'reporter'
+          const active = view === option.value
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              disabled={disabled}
+              title={disabled ? 'คลิปนี้ไม่มีแชท' : option.hint}
+              aria-pressed={active}
+              className={`rounded-lg px-3 py-1.5 text-sm transition ${
+                active
+                  ? 'bg-brand-600 font-medium text-white'
+                  : disabled
+                    ? 'cursor-not-allowed text-slate-300 dark:text-slate-600'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+              }`}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+      <p className="text-xs text-slate-400" lang="th">
+        {hasChat
+          ? `${VIEWS.find((v) => v.value === view)?.hint} · มีแชท ${chatSegments} ช่วง`
+          : 'คลิปนี้ไม่มีแชท จึงดูได้เฉพาะเนื้อข่าวจากเสียงพูด'}
+      </p>
+    </div>
+  )
+}
+
 function ProgrammeTimeline({
   programme,
-  onHeadlines,
+  view,
+  onEnriched,
 }: {
   programme: Programme
-  onHeadlines: () => void
+  view: TimelineView
+  onEnriched: () => void
 }) {
   const segments = programme.segments
   const total = useMemo(
     () => segments.reduce((max, s) => Math.max(max, s.end_ms), 0),
     [segments],
   )
+
+  // One request for every story's chat counts, and only when the reader has
+  // actually asked to see them.
+  const wantsChat = view !== 'reporter'
+  const reactions = useAsync(
+    () =>
+      wantsChat && programme.chat_segments > 0
+        ? api.programmeReactions(programme.video_id)
+        : Promise.resolve<SegmentReaction[]>([]),
+    [programme.video_id, wantsChat, programme.pending_reactions],
+  )
+  const bySegment = useMemo(() => {
+    const map = new Map<number, SegmentReaction>()
+    for (const row of reactions.data ?? []) map.set(row.segment_id, row)
+    return map
+  }, [reactions.data])
 
   return (
     <>
@@ -186,13 +298,21 @@ function ProgrammeTimeline({
         </div>
 
         <TopicStrip segments={segments} total={total} />
-        <HeadlineWriter programme={programme} onProgress={onHeadlines} />
+        <EnrichmentRunner
+          key={programme.video_id}
+          programme={programme}
+          onProgress={onEnriched}
+        />
       </section>
 
       <ol className="space-y-3">
         {segments.map((segment) => (
           <li key={segment.id}>
-            <SegmentCard segment={segment} />
+            <SegmentCard
+              segment={segment}
+              view={view}
+              reaction={bySegment.get(segment.id)}
+            />
           </li>
         ))}
       </ol>
@@ -201,38 +321,43 @@ function ProgrammeTimeline({
 }
 
 /**
- * Writes the LLM headlines an import could not wait for.
+ * Runs the LLM work an import could not wait for: story headlines, and one line
+ * of what the audience said during each story.
  *
- * A model spends 20-40 seconds on a story, so a 56-story programme is half an
+ * A model spends 10-40 seconds on each, so a 56-story programme is most of an
  * hour. That is far too long to hold an HTTP request, but perfectly fine as a
- * job the page watches: the backend commits every headline as it lands, so this
+ * job the page watches: the backend commits every unit as it lands, so this
  * reloads the timeline on each poll and the cards improve one by one while the
  * reader is looking at them.
  *
- * Nothing here is destructive. Stopping keeps every headline already written,
- * and closing the page does not stop the job -- reopening it picks the progress
- * back up.
+ * Nothing here is destructive. Stopping keeps everything already written, and
+ * closing the page does not stop the job — reopening it picks the progress back
+ * up.
  */
-function HeadlineWriter({
+function EnrichmentRunner({
   programme,
   onProgress,
 }: {
   programme: Programme
   onProgress: () => void
 }) {
-  const [job, setJob] = useState<HeadlineJob | null>(null)
+  const [job, setJob] = useState<EnrichmentJob | null>(null)
   const [starting, setStarting] = useState(false)
   const videoId = programme.video_id
-  // Kept in a ref so the polling effect does not restart on every render.
+  // Kept in a ref so the polling effect does not restart whenever the parent
+  // hands down a new callback identity, which it does on every render.
   const progressRef = useRef(onProgress)
-  progressRef.current = onProgress
+  useEffect(() => {
+    progressRef.current = onProgress
+  }, [onProgress])
 
-  // Pick up a job that was already running when the page opened.
+  // Pick up a job that was already running when the page opened. No reset of
+  // `job` is needed here: the parent keys this component on the video id, so
+  // switching programmes mounts a fresh one rather than reusing this state.
   useEffect(() => {
     let cancelled = false
-    setJob(null)
     api
-      .headlineStatus(videoId)
+      .enrichmentStatus(videoId)
       .then((status) => {
         if (!cancelled) setJob(status)
       })
@@ -251,7 +376,7 @@ function HeadlineWriter({
     let stopped = false
     const timer = window.setInterval(async () => {
       try {
-        const status = await api.headlineStatus(videoId)
+        const status = await api.enrichmentStatus(videoId)
         if (stopped) return
         setJob((previous) => {
           // Only reload the list when a headline actually landed, so a poll
@@ -263,8 +388,8 @@ function HeadlineWriter({
           progressRef.current()
           notify(
             status.state === 'done'
-              ? `เขียนพาดหัวครบ ${status.total} ช่วงแล้ว`
-              : status.note || `งานเขียนพาดหัว: ${status.state}`,
+              ? `โมเดลเขียนครบ ${status.total} รายการแล้ว`
+              : status.note || `งานของโมเดล: ${status.state}`,
             status.state === 'done' ? 'success' : 'info',
           )
         }
@@ -281,10 +406,10 @@ function HeadlineWriter({
   const start = async () => {
     setStarting(true)
     try {
-      setJob(await api.startHeadlines(videoId))
+      setJob(await api.startEnrichment(videoId))
     } catch (err) {
       notify(
-        err instanceof ApiError ? err.message : 'เริ่มเขียนพาดหัวไม่สำเร็จ',
+        err instanceof ApiError ? err.message : 'เริ่มงานของโมเดลไม่สำเร็จ',
         'error',
       )
     } finally {
@@ -294,17 +419,19 @@ function HeadlineWriter({
 
   const stop = async () => {
     try {
-      setJob(await api.stopHeadlines(videoId))
+      setJob(await api.stopEnrichment(videoId))
     } catch {
       /* Already finished on its own. */
     }
   }
 
-  const pending = programme.pending_headlines
+  const pendingHeadlines = programme.pending_headlines
+  const pendingReactions = programme.pending_reactions
+  const pending = pendingHeadlines + pendingReactions
   if (!running && pending === 0) {
     return (
       <p className="mt-4 text-xs text-slate-400" lang="th">
-        ทุกช่วงข่าวมีพาดหัวที่เขียนโดยโมเดลภาษาแล้ว
+        ทุกช่วงข่าวมีพาดหัวและสรุปความเห็นผู้ชมที่เขียนโดยโมเดลภาษาแล้ว
       </p>
     )
   }
@@ -314,11 +441,17 @@ function HeadlineWriter({
       <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/40">
         <div className="min-w-0 flex-1">
           <p className="text-sm text-slate-700 dark:text-slate-200" lang="th">
-            {pending} ช่วงยังใช้พาดหัวที่ตัดมาจากข้อความในคลิป
+            {[
+              pendingHeadlines > 0 ? `พาดหัว ${pendingHeadlines} ช่วง` : null,
+              pendingReactions > 0 ? `สรุปความเห็นผู้ชม ${pendingReactions} ช่วง` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}{' '}
+            ยังไม่ได้ให้โมเดลเขียน
           </p>
           <p className="mt-0.5 text-xs text-slate-400" lang="th">
-            ให้โมเดลภาษา (ทำงานในเครื่อง ฟรี) เขียนพาดหัวให้ · ประมาณ 20-40
-            วินาทีต่อช่วง ทำงานเบื้องหลัง ปิดหน้านี้ได้
+            โมเดลภาษาทำงานในเครื่อง ฟรี · ประมาณ 10-40 วินาทีต่อรายการ
+            ทำงานเบื้องหลัง ปิดหน้านี้ได้
             {job?.note ? ` · ${job.note}` : ''}
           </p>
         </div>
@@ -328,7 +461,7 @@ function HeadlineWriter({
           disabled={starting}
           className="btn-primary shrink-0"
         >
-          {starting ? 'กำลังเริ่ม…' : 'เขียนพาดหัวด้วย AI'}
+          {starting ? 'กำลังเริ่ม…' : 'ให้ AI เขียนพาดหัว + สรุปความเห็น'}
         </button>
       </div>
     )
@@ -339,7 +472,13 @@ function HeadlineWriter({
     <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/40">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-slate-700 dark:text-slate-200" lang="th">
-          กำลังเขียนพาดหัว {job.done}/{job.total} ช่วง
+          กำลังให้โมเดลเขียน {job.done}/{job.total} รายการ
+          {job.headlines + job.reactions > 0 && (
+            <span className="text-slate-400">
+              {' '}
+              (พาดหัว {job.headlines} · ความเห็นผู้ชม {job.reactions})
+            </span>
+          )}
           {job.eta_seconds != null && job.eta_seconds > 0 && (
             <span className="text-slate-400">
               {' '}
@@ -424,8 +563,18 @@ function TopicStrip({
   )
 }
 
-function SegmentCard({ segment }: { segment: NewsSegment }) {
+function SegmentCard({
+  segment,
+  view,
+  reaction,
+}: {
+  segment: NewsSegment
+  view: TimelineView
+  reaction?: SegmentReaction
+}) {
   const [open, setOpen] = useState(false)
+  const showReporter = view !== 'viewers'
+  const showViewers = view !== 'reporter'
 
   return (
     <article className="card overflow-hidden">
@@ -482,7 +631,7 @@ function SegmentCard({ segment }: { segment: NewsSegment }) {
 
           <NameCorrections segment={segment} />
 
-          {segment.summary && (
+          {showReporter && segment.summary && (
             <p
               className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-300"
               lang="th"
@@ -494,7 +643,7 @@ function SegmentCard({ segment }: { segment: NewsSegment }) {
           {/* Keywords used to BE the headline. Now the headline is a real
               phrase, so they move here — still visible, no longer pretending
               to be a title. */}
-          {segment.keywords.length > 0 && (
+          {showReporter && segment.keywords.length > 0 && (
             <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="คำสำคัญ">
               {segment.keywords.slice(0, 6).map((word) => (
                 <li
@@ -508,6 +657,8 @@ function SegmentCard({ segment }: { segment: NewsSegment }) {
             </ul>
           )}
 
+          {showViewers && <ViewerReaction segment={segment} reaction={reaction} />}
+
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <a
               href={segment.youtube_url}
@@ -517,17 +668,19 @@ function SegmentCard({ segment }: { segment: NewsSegment }) {
             >
               ▶ ดูช่วงนี้ในคลิป
             </a>
-            <button
-              type="button"
-              onClick={() => setOpen((value) => !value)}
-              aria-expanded={open}
-              className="text-xs text-slate-500 hover:underline dark:text-slate-400"
-            >
-              {open ? 'ซ่อนข้อความถอดเสียง' : 'ดูข้อความถอดเสียง'}
-            </button>
+            {showReporter && (
+              <button
+                type="button"
+                onClick={() => setOpen((value) => !value)}
+                aria-expanded={open}
+                className="text-xs text-slate-500 hover:underline dark:text-slate-400"
+              >
+                {open ? 'ซ่อนข้อความถอดเสียง' : 'ดูข้อความถอดเสียง'}
+              </button>
+            )}
           </div>
 
-          {open && (
+          {showReporter && open && (
             <p
               className="mt-3 max-h-56 overflow-y-auto rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600 dark:bg-slate-900/50 dark:text-slate-300"
               lang="th"
@@ -587,6 +740,170 @@ function NameCorrections({ segment }: { segment: NewsSegment }) {
         </span>
       ))}
     </p>
+  )
+}
+
+/** Sentiment colours, matching the badges used elsewhere in the dashboard. */
+const MOOD_COLOR: Record<string, string> = {
+  positive: 'bg-emerald-500',
+  neutral: 'bg-slate-400',
+  negative: 'bg-rose-500',
+}
+
+const MOOD_LABEL: Record<string, string> = {
+  positive: 'เชิงบวก',
+  neutral: 'กลาง ๆ',
+  negative: 'เชิงลบ',
+  // A tie has no majority, and saying so is truer than picking a side.
+  mixed: 'ความเห็นแบ่งกัน',
+}
+
+/**
+ * What the audience said while this story was on air.
+ *
+ * The counts and the mood bar come from data already stored, so they are always
+ * there. The one-line summary is the model's, and is simply absent until
+ * someone runs the enrichment — an absent line is honest; an invented one would
+ * not be.
+ *
+ * Sample messages are fetched only when the reader opens them: 76 cards would
+ * otherwise ship thousands of messages nobody asked to read.
+ */
+function ViewerReaction({
+  segment,
+  reaction,
+}: {
+  segment: NewsSegment
+  reaction?: SegmentReaction
+}) {
+  const [detail, setDetail] = useState<Reaction | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  if (!reaction || reaction.total === 0) {
+    return (
+      <p className="mt-2 text-xs text-slate-400" lang="th">
+        ไม่มีข้อความแชทในช่วงเวลานี้
+      </p>
+    )
+  }
+
+  const counts = reaction.sentiment_counts
+  const open = async () => {
+    if (detail) {
+      setDetail(null)
+      return
+    }
+    setLoading(true)
+    try {
+      setDetail(await api.segmentChat(segment.id))
+    } catch {
+      /* Leaving the counts on screen is a better failure than an error box. */
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="mt-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/40">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+        <span className="font-medium text-slate-700 dark:text-slate-200" lang="th">
+          ผู้ชม {reaction.total.toLocaleString()} ข้อความ
+        </span>
+        {reaction.mood && (
+          <span lang="th">
+            ·{' '}
+            {reaction.mood === 'mixed'
+              ? MOOD_LABEL.mixed
+              : `ส่วนใหญ่${MOOD_LABEL[reaction.mood] ?? reaction.mood}`}
+          </span>
+        )}
+      </div>
+
+      {/* The mood mix as one bar: the shape of the reaction at a glance. */}
+      <div
+        className="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+        role="img"
+        aria-label={Object.entries(counts)
+          .map(([name, value]) => `${MOOD_LABEL[name] ?? name} ${value}`)
+          .join(', ')}
+      >
+        {(['positive', 'neutral', 'negative'] as const).map((mood) =>
+          counts[mood] ? (
+            <div
+              key={mood}
+              className={MOOD_COLOR[mood]}
+              style={{ width: `${(counts[mood] / reaction.total) * 100}%` }}
+            />
+          ) : null,
+        )}
+      </div>
+
+      {reaction.summary ? (
+        <p className="mt-2 text-sm text-slate-700 dark:text-slate-200" lang="th">
+          {reaction.summary}
+          <span
+            className="ml-1.5 align-middle rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"
+            title="สรุปความเห็นผู้ชมโดยโมเดลภาษา"
+          >
+            AI สรุป
+          </span>
+        </p>
+      ) : (
+        <p className="mt-2 text-xs text-slate-400" lang="th">
+          ยังไม่มีสรุปความเห็นผู้ชมช่วงนี้ · กด “ให้ AI เขียนพาดหัว + สรุปความเห็น” ด้านบน
+        </p>
+      )}
+
+      <button
+        type="button"
+        onClick={open}
+        aria-expanded={detail !== null}
+        className="mt-2 text-xs text-slate-500 hover:underline dark:text-slate-400"
+      >
+        {loading
+          ? 'กำลังโหลด…'
+          : detail
+            ? 'ซ่อนข้อความจากผู้ชม'
+            : 'ดูข้อความจากผู้ชม'}
+      </button>
+
+      {detail && (
+        <div className="mt-2 space-y-2">
+          {detail.keywords.length > 0 && (
+            <ul className="flex flex-wrap gap-1.5" aria-label="คำที่ผู้ชมใช้บ่อย">
+              {detail.keywords.map((word) => (
+                <li
+                  key={word}
+                  className="rounded-md bg-white px-1.5 py-0.5 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                  lang="th"
+                >
+                  {word}
+                </li>
+              ))}
+            </ul>
+          )}
+          <ul className="max-h-56 space-y-1 overflow-y-auto text-xs">
+            {detail.samples.map((message, index) => (
+              <li
+                key={`${message.offset_ms}-${index}`}
+                className="flex gap-2 text-slate-600 dark:text-slate-300"
+                lang="th"
+              >
+                {/* Faded when the classifier was not confident enough to be
+                    presenting a verdict at all — see lib/sentiment. */}
+                <span
+                  className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
+                    MOOD_COLOR[message.sentiment] ?? MOOD_COLOR.neutral
+                  } ${isUnclear(message.confidence) ? 'opacity-30' : ''}`}
+                  aria-hidden
+                />
+                <span className="min-w-0">{message.text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   )
 }
 

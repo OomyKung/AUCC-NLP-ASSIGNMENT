@@ -532,6 +532,56 @@ stream looking for one story.
   general stopword list defines the trained models' feature space, so adding to it
   would silently change every model metric in this README.
 
+### Why chat sentiment reads the way it does
+
+The per-message sentiment looked wrong — a screen of "neutral 50%" including
+messages that are plainly insults. Four things were measured before anything
+changed, and three of them were rejected.
+
+**What it actually was.** `อัปรีย์` ("wretched", a common Thai insult) appears
+**zero times** in Wisesight's 21,628 training rows. So does `ไอ้หนู`; `ตกต่ำ`
+appears once. A model cannot learn a word it has never seen, and no amount of
+tuning changes that — the classifier scored `ตัวอัปรีย์ ห้อยของอัปรีย์` neutral
+at 0.84 because, to it, the sentence contains no known sentiment at all.
+
+| Tried | Result | Verdict |
+|---|---|---|
+| **attacut tokeniser** for chat (better OOV segmentation) | CV 0.6730 vs newmm's 0.6695; **McNemar p = 0.476** — 125 rows fixed, 113 broken. 10× slower | **rejected** — indistinguishable from noise, and it flipped `ว่าละทำไมประเทศถึงตกต่ำ` the *wrong* way |
+| **Local LLM as the classifier** (qwen2.5:7b, batched) | 0.692 accuracy / 0.594 macro-F1 on 120 gold rows, against the model's 0.750 / 0.689 | **rejected** — measurably worse than the model it would replace |
+| **Confident-lexicon override** (let a strong polarity word win) | where \|score\| ≥ 2.0 the lexicon is right **41%** of the time and the model **80%** | **rejected** — the intuition is backwards |
+| **Blending the lexicon in** at a fitted weight, after extending it | test macro-F1 **0.6693 → 0.6818**, accuracy 0.707 → 0.718, **McNemar p = 0.0091** | **adopted** |
+
+**What was adopted.** The lexicon gained the contemptuous register Thai news
+chat actually uses — `ทุเรศ` (78 occurrences in the collected chat), `ขี้โกง`
+(31), `หน้าด้าน` (27), `สันดาน` (15), `เฮงซวย` (13), `ตอแหล` (11) and a dozen
+more, none of which were in it — and chat sentiment now blends model and lexicon
+at α = 0.75, fitted out-of-fold on the training split and scored once on the
+test split.
+
+**What it did not fix.** The neutral share went *up* slightly (60.7% → 61.8%),
+because the gain came from precision rather than from finding more negatives.
+Most chat genuinely is neutral. And `ตัวอัปรีย์` still reads neutral, now at
+0.68 rather than 0.84: a model that is wrong and confident still outvotes a
+lexicon that is right and confident, and the measurement above says overruling
+it would make the system worse overall.
+
+**So the interface stopped overclaiming.** Confidence turned out to be
+well-calibrated, which makes it useful:
+
+| confidence | share of messages | accuracy |
+|---|---|---|
+| below 0.50 | 13% | **47.5%** |
+| 0.50 – 0.60 | 18% | 57.3% |
+| 0.70 – 0.85 | 37% | 83.2% |
+| above 0.85 | 12% | 93.5% |
+
+Under 0.5 the classifier is barely better than always guessing the majority
+class, so the dashboard now shows **ไม่ชัดเจน** there instead of a label and a
+percentage — 17.4% of the collected messages. The label is still stored and
+still counted in the aggregates; this governs what the interface *claims*.
+Abstaining there would keep 87% of messages at 75.5% accuracy against 71.8%
+over everything.
+
 ### Data collection
 
 Thai news channels stream 24/7 on YouTube with active chat. That chat is

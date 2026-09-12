@@ -146,16 +146,24 @@ def _build_sentiment(
             note = f"no trained model found (run: {script})"
         except ImportError as exc:
             note = f"sklearn backend unavailable: {exc}"
-    elif requested == "blend":
+    elif requested in {"blend", "chat-blend"}:
+        # "chat-blend" blends the *chat* artefact with the lexicon, using its
+        # own weight: the two domains needed different ones (news 0.85, chat
+        # 0.75), each fitted out-of-fold on its own corpus.
+        chat = requested == "chat-blend"
         try:
             from app.nlp.backends.blended import BlendedSentimentBackend
 
             backend = BlendedSentimentBackend.load(
-                settings.nlp_sentiment_blend_alpha
+                settings.nlp_chat_sentiment_blend_alpha
+                if chat
+                else settings.nlp_sentiment_blend_alpha,
+                kind="chat_sentiment" if chat else "sentiment",
             )
             if backend is not None:
                 return backend, BackendStatus(requested, backend.name, True)
-            note = "no trained model to blend (run: python train.py)"
+            script = "train_chat_sentiment.py" if chat else "train.py"
+            note = f"no trained model to blend (run: python {script})"
         except (ImportError, ValueError) as exc:
             note = f"blend backend unavailable: {exc}"
     elif requested == "transformer":

@@ -17,14 +17,16 @@ from app.models.chat import ChatStream
 from app.schemas.broadcast import (
     AnalyseVideoRequest,
     AnalyseVideoResponse,
-    HeadlineJobRequest,
-    HeadlineJobStatus,
+    EnrichmentJobRequest,
+    EnrichmentJobStatus,
     ProgrammeOut,
+    ReactionOut,
+    SegmentReaction,
     SegmentListResponse,
     SegmentOut,
     TranscriptOut,
 )
-from app.services import headline_jobs
+from app.services import enrichment_jobs, reactions
 from app.services.broadcast import analyse_video, list_segments
 from app.services.collectors.base import CollectorError
 from app.services.transcripts import TranscriptUnavailable
@@ -112,6 +114,15 @@ def programmes(db: Session = Depends(get_db)) -> list[ProgrammeOut]:
         stream = db.get(ChatStream, transcript.stream_id)
         if stream is None:
             continue
+        # One query for the whole programme, not one per story.
+        chat_counts = reactions.count_by_segment(db, list(transcript.segments))
+        chat_segments = sum(1 for count in chat_counts.values() if count)
+        pending_reactions = sum(
+            1
+            for segment in transcript.segments
+            if chat_counts.get(segment.id, 0) >= reactions.MIN_MESSAGES_TO_SUMMARISE
+            and not segment.chat_summary
+        )
         results.append(
             ProgrammeOut(
                 video_id=stream.video_id,
@@ -131,6 +142,8 @@ def programmes(db: Session = Depends(get_db)) -> list[ProgrammeOut]:
                     for segment in transcript.segments
                     if segment.enriched_by != "llm"
                 ),
+                pending_reactions=pending_reactions,
+                chat_segments=chat_segments,
             )
         )
     return results
@@ -207,53 +220,105 @@ def analyse(
 
 
 @router.post(
-    "/broadcast/headlines",
-    response_model=HeadlineJobStatus,
-    summary="Write LLM headlines for a programme, in the background",
+    "/broadcast/enrich",
+    response_model=EnrichmentJobStatus,
+    summary="Write LLM headlines and chat summaries, in the background",
 )
-def start_headlines(payload: HeadlineJobRequest) -> HeadlineJobStatus:
-    """Fill in the headlines an import could not wait for.
+def start_enrichment(payload: EnrichmentJobRequest) -> EnrichmentJobStatus:
+    """Fill in the model work an import could not wait for.
 
     Returns immediately with a job to poll. The work runs in a worker thread and
-    commits each headline as it lands, so the timeline fills in while the caller
+    commits each unit as it lands, so the timeline fills in while the caller
     watches and nothing is lost if the poll stops or the process restarts.
 
     Calling this again for a programme already being written returns the same
     job rather than starting a second one.
     """
     try:
-        job = headline_jobs.start(payload.video_id)
-    except headline_jobs.JobRejected as exc:
+        job = enrichment_jobs.start(payload.video_id)
+    except enrichment_jobs.JobRejected as exc:
         # Every rejection is something the caller can act on: another programme
         # is running, the video was never imported, or there is nothing to do.
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return HeadlineJobStatus(**job.as_dict())
+    return EnrichmentJobStatus(**job.as_dict())
 
 
 @router.get(
-    "/broadcast/headlines/{video_id}",
-    response_model=HeadlineJobStatus,
-    summary="Progress of a headline-writing job",
+    "/broadcast/enrich/{video_id}",
+    response_model=EnrichmentJobStatus,
+    summary="Progress of an enrichment job",
 )
-def headline_status(video_id: str) -> HeadlineJobStatus:
-    job = headline_jobs.get(video_id)
+def enrichment_status(video_id: str) -> EnrichmentJobStatus:
+    job = enrichment_jobs.get(video_id)
     if job is None:
         raise HTTPException(
-            status_code=404, detail=f"No headline job has been started for {video_id}."
+            status_code=404, detail=f"No enrichment job has been started for {video_id}."
         )
-    return HeadlineJobStatus(**job.as_dict())
+    return EnrichmentJobStatus(**job.as_dict())
 
 
 @router.delete(
-    "/broadcast/headlines/{video_id}",
-    response_model=HeadlineJobStatus,
-    summary="Stop a headline-writing job",
+    "/broadcast/enrich/{video_id}",
+    response_model=EnrichmentJobStatus,
+    summary="Stop an enrichment job",
 )
-def stop_headlines(video_id: str) -> HeadlineJobStatus:
-    """Stop after the story in flight. Everything written so far is kept."""
-    job = headline_jobs.cancel(video_id)
+def stop_enrichment(video_id: str) -> EnrichmentJobStatus:
+    """Stop after the unit in flight. Everything written so far is kept."""
+    job = enrichment_jobs.cancel(video_id)
     if job is None:
         raise HTTPException(
-            status_code=404, detail=f"No headline job has been started for {video_id}."
+            status_code=404, detail=f"No enrichment job has been started for {video_id}."
         )
-    return HeadlineJobStatus(**job.as_dict())
+    return EnrichmentJobStatus(**job.as_dict())
+
+
+@router.get(
+    "/broadcast/programmes/{video_id}/reactions",
+    response_model=list[SegmentReaction],
+    summary="Every story's audience reaction, without the messages",
+)
+def programme_reactions(
+    video_id: str, db: Session = Depends(get_db)
+) -> list[SegmentReaction]:
+    """One request for the whole timeline's viewer view.
+
+    Rendering 76 cards must not be 76 requests, and shipping every message to
+    draw a mood bar would be most of a megabyte nobody asked to read.
+    """
+    segments = enrichment_jobs.segments_for(db, video_id)
+    if not segments:
+        raise HTTPException(
+            status_code=404, detail=f"No stories are stored for {video_id}."
+        )
+    overview = reactions.overview_by_segment(db, segments)
+    return [
+        SegmentReaction(
+            segment_id=segment_id,
+            total=reaction.total,
+            sentiment_counts=reaction.sentiment_counts,
+            mood=reaction.mood,
+            summary=reaction.summary,
+        )
+        for segment_id, reaction in overview.items()
+    ]
+
+
+@router.get(
+    "/broadcast/segments/{segment_id}/chat",
+    response_model=ReactionOut,
+    summary="What viewers said while this story was on air",
+)
+def segment_reaction(
+    segment_id: int, db: Session = Depends(get_db)
+) -> ReactionOut:
+    """The other half of the broadcast: the audience, aligned to the same clock.
+
+    Chat and transcript are timestamped against the same stream, so a story's
+    time range selects the messages that reacted to it. Everything but the
+    one-line summary is computed from stored data, so this stays fast and works
+    with no model at all.
+    """
+    segment = db.get(NewsSegment, segment_id)
+    if segment is None:
+        raise HTTPException(status_code=404, detail=f"No story with id {segment_id}.")
+    return ReactionOut(**reactions.build(db, segment).as_dict())

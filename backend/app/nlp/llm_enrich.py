@@ -79,6 +79,19 @@ HEADLINE_PROMPT = """เขียนพาดหัวข่าวภาษา�
 
 คำถอดเสียง: {text}"""
 
+# What the audience was saying, not what the news was about. The distinction
+# matters: asked to "summarise", a model describes the news story the viewers
+# are reacting to, which the timeline already says one line above. So the
+# instruction is about *them* -- their opinion, their mood, their argument.
+CHAT_PROMPT = """ข้อความด้านล่างคือแชทของผู้ชมรายการข่าว ขณะที่กำลังออกอากาศข่าวช่วงหนึ่ง
+สรุปเป็นภาษาไทยหนึ่งประโยค ไม่เกิน 90 ตัวอักษร ว่า "ผู้ชมกำลังพูดถึงอะไรและรู้สึกอย่างไร"
+ให้สรุปความเห็นของผู้ชม ไม่ใช่สรุปตัวข่าว
+ถ้าผู้ชมส่วนใหญ่แค่ทักทายหรือพิมพ์อีโมจิ ให้บอกตามนั้น
+ตอบเพียงบรรทัดเดียว ไม่ต้องอธิบาย ไม่ต้องใส่เครื่องหมายคำพูด
+
+แชทผู้ชม:
+{text}"""
+
 PROMPT = """คุณเป็นบรรณาธิการข่าวไทย ข้อความด้านล่างเป็นคำถอดเสียงอัตโนมัติ (ASR) จากรายการข่าวโทรทัศน์ไทย ซึ่งมักสะกดชื่อคนผิดเพราะถอดตามเสียง เช่น "ศศิภาพร จันทวิสูตร" อาจกลายเป็น "สักสิภาพรจันทวิสูตร"
 
 งานของคุณ:

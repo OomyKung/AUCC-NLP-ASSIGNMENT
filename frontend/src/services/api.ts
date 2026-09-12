@@ -12,8 +12,8 @@ import type {
   AnalyzeResult,
   BackendStatus,
   ChatMessage,
+  EnrichmentJob,
   Evaluation,
-  HeadlineJob,
   Health,
   IngestResult,
   KeywordCount,
@@ -21,7 +21,9 @@ import type {
   NewsFilters,
   NewsPage,
   Programme,
+  Reaction,
   SegmentPage,
+  SegmentReaction,
   SnapshotInfo,
   Statistics,
   Stream,
@@ -170,16 +172,23 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  /** Start writing LLM headlines for a programme. Returns a job to poll. */
-  startHeadlines: (video_id: string) =>
-    request<HeadlineJob>('/broadcast/headlines', {
+  /** Start the LLM work for a programme (headlines + chat summaries). */
+  startEnrichment: (video_id: string) =>
+    request<EnrichmentJob>('/broadcast/enrich', {
       method: 'POST',
       body: JSON.stringify({ video_id }),
     }),
-  headlineStatus: (video_id: string) =>
-    request<HeadlineJob>(`/broadcast/headlines/${video_id}`),
-  stopHeadlines: (video_id: string) =>
-    request<HeadlineJob>(`/broadcast/headlines/${video_id}`, { method: 'DELETE' }),
+  enrichmentStatus: (video_id: string) =>
+    request<EnrichmentJob>(`/broadcast/enrich/${video_id}`),
+  stopEnrichment: (video_id: string) =>
+    request<EnrichmentJob>(`/broadcast/enrich/${video_id}`, { method: 'DELETE' }),
+
+  /** Every story's audience reaction for one programme, counts only. */
+  programmeReactions: (video_id: string) =>
+    request<SegmentReaction[]>(`/broadcast/programmes/${video_id}/reactions`),
+  /** One story's chat in full, including sample messages. */
+  segmentChat: (segment_id: number) =>
+    request<Reaction>(`/broadcast/segments/${segment_id}/chat`),
 
   streams: () => request<Stream[]>('/streams'),
   snapshots: () => request<SnapshotInfo[]>('/ingest/snapshots'),

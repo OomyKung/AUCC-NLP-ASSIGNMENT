@@ -132,6 +132,14 @@ class NewsSegment(Base):
     # extractive default, "llm" when the model was used.
     enriched_by: Mapped[str] = mapped_column(String(20), default="")
 
+    # What the audience said *while this story was on air*, in one line, written
+    # by the LLM. Empty when nobody has asked for it, and when the video has no
+    # chat at all -- which is most of them, since news channels switch chat
+    # replay off. Stored on the story rather than derived on read because it
+    # costs a model call, and the chat it summarises never changes.
+    chat_summary: Mapped[str] = mapped_column(Text, default="")
+    chat_message_count: Mapped[int] = mapped_column(Integer, default=0)
+
     # Deep link to the exact moment, and the cached frame captured there.
     youtube_url: Mapped[str] = mapped_column(String(200), default="")
     frame_path: Mapped[str | None] = mapped_column(String(300))

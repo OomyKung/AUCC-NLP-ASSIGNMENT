@@ -46,7 +46,13 @@ def list_topics() -> list[dict]:
 
 @router.get("/sentiments", summary="The 3 sentiment classes")
 def list_sentiments() -> list[dict]:
-    """Return the sentiment taxonomy with display colours."""
+    """Return the sentiment taxonomy with display colours.
+
+    Each entry carries ``unclear_below``: the confidence under which the
+    interface should not present a prediction as a verdict. Served rather than
+    hard-coded in the frontend so the number cannot drift away from the value
+    the backend was measured at.
+    """
     return [
         {
             "slug": s.slug,
@@ -54,6 +60,7 @@ def list_sentiments() -> list[dict]:
             "english": s.english,
             "color": s.color,
             "color_dark": s.color_dark,
+            "unclear_below": settings.sentiment_unclear_below,
         }
         for s in SENTIMENTS
     ]

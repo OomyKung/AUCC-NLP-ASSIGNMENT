@@ -123,7 +123,7 @@ describe('Analyze', () => {
       expect(screen.getByRole('heading', { name: 'Analyze News' })).toBeTruthy(),
     )
     expect(screen.getByText('วิเคราะห์ข้อความข่าว')).toBeTruthy()
-    expect(screen.getByText('นำเข้าแชทสดจาก YouTube')).toBeTruthy()
+    expect(screen.getByText('นำเข้าคลิปข่าวจาก YouTube')).toBeTruthy()
 
     // The submit button starts disabled: a blank form must not be submittable.
     const submit = screen.getByRole('button', { name: 'Analyze News' })

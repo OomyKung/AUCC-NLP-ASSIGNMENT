@@ -1509,15 +1509,15 @@ def job_registry(monkeypatch, tmp_path, broadcast_db):
     path at all.
     """
     from app.config import settings
-    from app.services import headline_jobs
+    from app.services import enrichment_jobs
 
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     monkeypatch.setattr(
-        headline_jobs, "SessionLocal", lambda: _NonClosingSession(broadcast_db)
+        enrichment_jobs, "SessionLocal", lambda: _NonClosingSession(broadcast_db)
     )
-    headline_jobs._jobs.clear()
-    yield headline_jobs
-    headline_jobs._jobs.clear()
+    enrichment_jobs._jobs.clear()
+    yield enrichment_jobs
+    enrichment_jobs._jobs.clear()
 
 
 class _NonClosingSession:
@@ -1556,7 +1556,7 @@ def test_a_job_writes_every_missing_headline(job_registry, broadcast_db, monkeyp
     assert job.total == 3
     assert _wait_for(lambda: not job.running), job.state
     assert job.state == "done"
-    assert job.written == 3
+    assert job.headlines == 3
 
     rows = broadcast_db.query(NewsSegment).all()
     assert all(row.enriched_by == "llm" for row in rows)
@@ -1583,7 +1583,7 @@ def test_only_one_programme_is_written_at_a_time(job_registry, monkeypatch):
     job = job_registry.start("jobVideo001")
     assert _wait_for(lambda: job.state == "running")
     try:
-        with pytest.raises(job_registry.JobRejected, match="Already writing"):
+        with pytest.raises(job_registry.JobRejected, match="Already enriching"):
             job_registry.start("someOtherVid")
         # The same video is not a second job -- a double-clicked button is safe.
         assert job_registry.start("jobVideo001") is job
@@ -1604,7 +1604,7 @@ def test_a_finished_programme_is_refused(job_registry, broadcast_db):
         row.enriched_by = "llm"
     broadcast_db.commit()
 
-    with pytest.raises(job_registry.JobRejected, match="already has a written"):
+    with pytest.raises(job_registry.JobRejected, match="already written"):
         job_registry.start("jobVideo001")
 
 
@@ -1672,11 +1672,209 @@ def test_the_headline_endpoints_report_what_the_caller_can_act_on(job_registry):
     from app.main import create_app
 
     with TestClient(create_app()) as client:
-        assert client.get("/api/broadcast/headlines/neverStarted").status_code == 404
-        assert client.delete("/api/broadcast/headlines/neverStarted").status_code == 404
+        assert client.get("/api/broadcast/enrich/neverStarted").status_code == 404
+        assert client.delete("/api/broadcast/enrich/neverStarted").status_code == 404
 
         response = client.post(
-            "/api/broadcast/headlines", json={"video_id": "neverImported"}
+            "/api/broadcast/enrich", json={"video_id": "neverImported"}
         )
         assert response.status_code == 409
         assert "Import the video first" in response.json()["detail"]
+
+
+# --------------------------------------------------------------------------
+# The audience, aligned to the same clock as the newsreader
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def broadcast_with_chat(broadcast_db):
+    """Add chat to the stored programme, timestamped inside its stories."""
+    from datetime import UTC, datetime
+
+    from app.models.broadcast import NewsSegment
+    from app.models.chat import ChatMessage
+
+    segments = broadcast_db.query(NewsSegment).order_by(NewsSegment.start_ms).all()
+    stream_id = segments[0].stream_id
+    base = datetime(2026, 9, 1, 12, 0, tzinfo=UTC)
+
+    # Eight messages inside the first story, one inside the second, none in the
+    # third -- so the fixture covers "enough to summarise", "too few" and "none".
+    for index in range(8):
+        broadcast_db.add(
+            ChatMessage(
+                stream_id=stream_id,
+                text=f"ผู้ชมความเห็นที่ {index} ไม่เห็นด้วยเลยครับ",
+                published_at=base,
+                offset_ms=segments[0].start_ms + index * 1_000,
+                sentiment="negative" if index % 2 else "neutral",
+            )
+        )
+    broadcast_db.add(
+        ChatMessage(
+            stream_id=stream_id,
+            text="ข้อความเดียวในช่วงที่สอง",
+            published_at=base,
+            offset_ms=segments[1].start_ms + 500,
+            sentiment="positive",
+        )
+    )
+    # Spam inside the first story, which must not count as an opinion.
+    broadcast_db.add(
+        ChatMessage(
+            stream_id=stream_id,
+            text="5555555555",
+            published_at=base,
+            offset_ms=segments[0].start_ms + 100,
+            sentiment="neutral",
+            is_spam=True,
+        )
+    )
+    broadcast_db.commit()
+    return broadcast_db
+
+
+def test_chat_is_paired_with_the_story_it_reacted_to(broadcast_with_chat):
+    """The whole idea: both halves carry an offset from the start of the stream,
+    so a story's time range selects the messages that answered it."""
+    from app.models.broadcast import NewsSegment
+    from app.services import reactions
+
+    segments = (
+        broadcast_with_chat.query(NewsSegment).order_by(NewsSegment.start_ms).all()
+    )
+    first = reactions.build(broadcast_with_chat, segments[0])
+    second = reactions.build(broadcast_with_chat, segments[1])
+    third = reactions.build(broadcast_with_chat, segments[2])
+
+    assert first.total == 8  # the spam message is not an opinion
+    assert first.sentiment_counts == {"neutral": 4, "negative": 4}
+    assert second.total == 1
+    assert third.total == 0
+    assert first.samples and all("ผู้ชม" in s["text"] for s in first.samples)
+
+
+def test_the_bulk_overview_matches_the_per_story_view(broadcast_with_chat):
+    """The timeline renders every card from one query; it must agree with the
+    detailed read used when a card is opened."""
+    from app.models.broadcast import NewsSegment
+    from app.services import reactions
+
+    segments = (
+        broadcast_with_chat.query(NewsSegment).order_by(NewsSegment.start_ms).all()
+    )
+    overview = reactions.overview_by_segment(broadcast_with_chat, segments)
+
+    for segment in segments:
+        detailed = reactions.build(broadcast_with_chat, segment)
+        assert overview[segment.id].total == detailed.total
+        assert overview[segment.id].sentiment_counts == detailed.sentiment_counts
+        assert overview[segment.id].mood == detailed.mood
+
+
+def test_a_reaction_summary_is_only_planned_where_there_is_an_audience(
+    job_registry, broadcast_with_chat
+):
+    """Two people talking is not an audience reaction, and a story with no chat
+    has nothing to summarise. Planning them anyway would spend model time to
+    produce nothing."""
+    from app.services import enrichment_jobs
+
+    tasks = enrichment_jobs.plan(broadcast_with_chat, "jobVideo001")
+    reaction_tasks = [task for task in tasks if task[1] == enrichment_jobs.REACTION]
+
+    # Only the first story clears MIN_MESSAGES_TO_SUMMARISE.
+    assert len(reaction_tasks) == 1
+    headline_tasks = [task for task in tasks if task[1] == enrichment_jobs.HEADLINE]
+    assert len(headline_tasks) == 3
+    assert job_registry.pending(broadcast_with_chat, "jobVideo001") == (3, 1)
+
+
+def test_a_job_writes_headlines_and_chat_summaries_together(
+    job_registry, broadcast_with_chat, monkeypatch
+):
+    from app.models.broadcast import NewsSegment
+    from app.nlp import llm_enrich
+
+    def answer(prompt, *, timeout):
+        # The chat prompt is the one that shows the model actual messages.
+        return "ผู้ชมไม่พอใจการทำงานของหน่วยงาน" if "แชทผู้ชม" in prompt else "พาดหัวข่าว"
+
+    monkeypatch.setattr(llm_enrich, "_complete", answer)
+
+    job = job_registry.start("jobVideo001")
+    assert job.total == 4  # three headlines and one reaction
+    assert _wait_for(lambda: not job.running), job.state
+    assert job.state == "done"
+    assert (job.headlines, job.reactions) == (3, 1)
+
+    segments = (
+        broadcast_with_chat.query(NewsSegment).order_by(NewsSegment.start_ms).all()
+    )
+    assert segments[0].chat_summary == "ผู้ชมไม่พอใจการทำงานของหน่วยงาน"
+    assert segments[0].chat_message_count == 8
+    # A story nobody reacted to gets no invented summary.
+    assert segments[2].chat_summary == ""
+
+
+def test_a_tied_mood_is_reported_as_mixed_not_picked():
+    """4 negative against 4 neutral has no majority. Picking one is untrue, and
+    it was also unstable -- max() follows dictionary order, so the same story
+    reported a different mood depending on which query built it."""
+    from app.services.reactions import Reaction
+
+    assert Reaction(total=8, sentiment_counts={"neutral": 4, "negative": 4}).mood == "mixed"
+    assert Reaction(total=8, sentiment_counts={"negative": 4, "neutral": 4}).mood == "mixed"
+    assert Reaction(total=9, sentiment_counts={"neutral": 4, "negative": 5}).mood == "negative"
+    assert Reaction().mood == ""
+
+
+# --------------------------------------------------------------------------
+# Chat sentiment: the register gap, and not overclaiming
+# --------------------------------------------------------------------------
+
+
+def test_the_lexicon_covers_the_register_thai_news_chat_criticises_in():
+    """These words were missing from both halves of the chat classifier, which
+    is why insults scored neutral. "อัปรีย์" appears zero times in Wisesight's
+    21,628 training rows, so no amount of model tuning reaches it."""
+    from app.nlp.backends.lexicon_sentiment import LexiconSentimentBackend
+
+    backend = LexiconSentimentBackend()
+    for text in [
+        "ตัวอัปรีย์ ห้อยของอัปรีย์",
+        "ทุเรศที่สุด",
+        "นักการเมืองขี้โกง",
+        "ไอ้พวกตอแหล หน้าด้านมาก",
+        "พวกเฮงซวย สันดานเสีย",
+    ]:
+        prediction = backend.predict(text)
+        assert prediction.label == "negative", f"{text} -> {prediction.label}"
+
+
+def test_chat_sentiment_is_blended_with_its_own_weight():
+    """News and chat needed different weights -- 0.85 and 0.75 -- each fitted
+    out-of-fold on its own corpus. One shared constant would be a guess for at
+    least one of them."""
+    from app.config import settings
+
+    assert settings.nlp_chat_sentiment_backend == "chat-blend"
+    assert settings.nlp_chat_sentiment_blend_alpha == 0.75
+    assert settings.nlp_sentiment_blend_alpha == 0.85
+
+
+def test_the_unclear_threshold_is_served_not_hard_coded():
+    """The frontend must not carry its own copy of a number the backend
+    measured, or the two drift apart silently."""
+    from fastapi.testclient import TestClient
+
+    from app.config import settings
+    from app.main import create_app
+
+    with TestClient(create_app()) as client:
+        rows = client.get("/api/sentiments").json()
+
+    assert rows
+    for row in rows:
+        assert row["unclear_below"] == settings.sentiment_unclear_below

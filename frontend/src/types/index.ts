@@ -11,6 +11,12 @@ export interface Taxonomy {
   english: string
   color: string
   color_dark?: string
+  /**
+   * Confidence under which a per-message prediction is not presented as a
+   * verdict. Served by the backend so it cannot drift from the value the model
+   * was measured at: under 0.5 the classifier is right 47.5% of the time.
+   */
+  unclear_below?: number
 }
 
 export interface Keyword {
@@ -378,22 +384,60 @@ export interface Programme {
   segment_count: number
   /** Stories still carrying an extractive headline rather than a written one. */
   pending_headlines: number
+  /** Stories with chat but no written summary of what viewers said. */
+  pending_reactions: number
+  /** Stories that have any chat at all — what makes the viewers' view worth offering. */
+  chat_segments: number
   segments: NewsSegment[]
 }
 
-/** Progress of writing LLM headlines for one programme. */
-export interface HeadlineJob {
+/**
+ * Progress of the LLM work for one programme.
+ *
+ * Counted in units, not stories: a story needing both a headline and a chat
+ * summary is two, so the progress bar means what it says.
+ */
+export interface EnrichmentJob {
   video_id: string
   state: 'queued' | 'running' | 'done' | 'failed' | 'cancelled'
   total: number
   done: number
-  written: number
-  reused: number
+  headlines: number
+  reactions: number
   latest: string
   note: string
   elapsed_seconds: number
   eta_seconds: number | null
 }
+
+/** One story's chat, as the timeline lists it: counts only, no messages. */
+export interface SegmentReaction {
+  segment_id: number
+  total: number
+  sentiment_counts: Record<string, number>
+  mood: string
+  /** One line of what viewers were saying, written by the LLM. */
+  summary: string
+}
+
+/** One story's chat in full, fetched when a card is opened. */
+export interface Reaction {
+  total: number
+  sentiment_counts: Record<string, number>
+  mood: string
+  keywords: string[]
+  samples: {
+    text: string
+    sentiment: string
+    /** Faded in the UI when below the measured "unclear" threshold. */
+    confidence: number
+    offset_ms: number
+  }[]
+  summary: string
+}
+
+/** Which half of the broadcast the timeline is showing. */
+export type TimelineView = 'reporter' | 'viewers' | 'both'
 
 export interface SegmentPage {
   total: number

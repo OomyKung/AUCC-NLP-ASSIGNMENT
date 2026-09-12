@@ -85,9 +85,20 @@ class Settings(BaseSettings):
     # the gain is measured against both alternatives on one test set. The
     # lexicon remains the fallback when the artefact is absent, so a fresh
     # clone still works.
+    #
+    # Now blended with the polarity lexicon, because the model alone has a
+    # register gap the corpus cannot fix: Thai news chat criticises with words
+    # like "อัปรีย์" and "ทุเรศ", and "อัปรีย์" appears *zero* times in
+    # Wisesight's 21,628 training rows. A model cannot learn a word it has never
+    # seen, so it scored "ตัวอัปรีย์ ห้อยของอัปรีย์" neutral at 0.84.
+    #
+    # Measured on the official test split, scored once: model alone 0.6693
+    # macro-F1, blended 0.6818 (accuracy 0.707 -> 0.718). McNemar p = 0.0091 on
+    # 68 rows fixed against 40 broken, so the gain is significant rather than
+    # noise. Two alternatives were measured and rejected -- see the README.
     nlp_chat_sentiment_backend: Literal[
-        "wisesight", "sklearn", "lexicon", "transformer"
-    ] = "wisesight"
+        "chat-blend", "wisesight", "sklearn", "lexicon", "transformer"
+    ] = "chat-blend"
     nlp_summarizer_backend: Literal["extractive", "llm"] = "extractive"
 
     # Blend weights: P = alpha * P_model + (1 - alpha) * P_rules. Fitted by
@@ -96,6 +107,30 @@ class Settings(BaseSettings):
     # Re-fit these with `python ensemble.py` after retraining.
     nlp_topic_blend_alpha: float = 0.90
     nlp_sentiment_blend_alpha: float = 0.85
+    # Chat gets its own weight, fitted the same way on the Wisesight training
+    # split: 0.75, so the lexicon carries more of a decision here than it does
+    # on news prose. Letting a confident lexicon *override* the model was also
+    # measured and refused -- where |score| >= 2.0 the lexicon is right 41% of
+    # the time and the model 80%.
+    nlp_chat_sentiment_blend_alpha: float = 0.75
+
+    # Below this confidence a per-message sentiment is shown as "unclear"
+    # rather than as a verdict. Not a guess -- measured on the Wisesight test
+    # split with the deployed blend:
+    #
+    #   confidence     share of messages     accuracy
+    #   below 0.50           13%               47.5%
+    #   0.50 - 0.60          18%               57.3%
+    #   0.70 - 0.85          37%               83.2%
+    #   above 0.85           12%               93.5%
+    #
+    # Under 0.5 the classifier is barely better than guessing the majority
+    # class, so presenting "neutral 48%" as a finding tells a reader something
+    # untrue. Abstaining there keeps 87% of messages at 75.5% accuracy, against
+    # 71.8% over everything. The label is still stored and still counted in the
+    # aggregates -- this governs what the interface *claims*, not what is
+    # recorded.
+    sentiment_unclear_below: float = 0.5
     nlp_ner_backend: Literal["rules", "pythainlp"] = "rules"
 
     # ------------------------------------------------- transcripts (video audio)

@@ -68,10 +68,14 @@ class ProgrammeOut(BaseModel):
     url: str
     transcript: TranscriptOut | None = None
     segment_count: int = 0
-    # Stories still carrying an extractive headline. Surfaced so the timeline
-    # can offer to write the rest rather than leaving an imported programme
-    # quietly reading worse than the ones that ship with the repository.
+    # Work the LLM could still do here. Surfaced so the timeline can offer it
+    # rather than leaving an imported programme quietly reading worse than the
+    # ones that ship with the repository.
     pending_headlines: int = 0
+    pending_reactions: int = 0
+    # Stories that have any chat at all, which is what makes the viewers' view
+    # worth offering on this programme.
+    chat_segments: int = 0
     segments: list[SegmentOut] = []
 
 
@@ -116,18 +120,19 @@ class AnalyseVideoResponse(BaseModel):
     headlines_written: int = 0
 
 
-class HeadlineJobRequest(BaseModel):
-    """Ask for LLM headlines on a programme that already has stories."""
+class EnrichmentJobRequest(BaseModel):
+    """Ask the LLM to write what an import could not wait for."""
 
     video_id: str = Field(min_length=5, max_length=40)
 
 
-class HeadlineJobStatus(BaseModel):
-    """Progress of one programme's headline writing.
+class EnrichmentJobStatus(BaseModel):
+    """Progress of one programme's LLM work.
 
-    Reported rather than guessed at: a story takes about 20 seconds, so a long
-    programme is a quarter of an hour of work and the UI needs something honest
-    to show while it happens.
+    Counted in units rather than stories: a story needing both a headline and a
+    chat summary is two, so the progress bar means what it says. Reported rather
+    than guessed at, because at 10-40 seconds a unit a long programme is most of
+    an hour and the UI needs something honest to show while it happens.
     """
 
     video_id: str
@@ -135,9 +140,47 @@ class HeadlineJobStatus(BaseModel):
     state: str
     total: int
     done: int
-    written: int
-    reused: int
+    headlines: int
+    reactions: int
     latest: str = ""
     note: str = ""
     elapsed_seconds: float = 0.0
     eta_seconds: float | None = None
+
+
+class ChatSample(BaseModel):
+    """One viewer message, as shown beside the story it reacted to."""
+
+    text: str
+    sentiment: str
+    confidence: float = 0.0
+    offset_ms: int
+
+
+class SegmentReaction(BaseModel):
+    """One story's chat, without the messages themselves.
+
+    What the timeline needs to render every card at once: how many viewers
+    spoke, how they felt, and the one line describing it. The messages and the
+    keywords cost tokenising thousands of rows, so they come per story from
+    ``/broadcast/segments/{id}/chat`` when a card is opened.
+    """
+
+    segment_id: int
+    total: int = 0
+    sentiment_counts: dict[str, int] = {}
+    mood: str = ""
+    summary: str = ""
+
+
+class ReactionOut(BaseModel):
+    """What the audience said while one story was on air."""
+
+    total: int = 0
+    sentiment_counts: dict[str, int] = {}
+    mood: str = ""
+    keywords: list[str] = []
+    samples: list[ChatSample] = []
+    # One line written by the LLM. Empty until someone asks for it, and on the
+    # many videos that have no chat at all.
+    summary: str = ""

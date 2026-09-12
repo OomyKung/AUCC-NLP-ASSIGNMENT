@@ -175,12 +175,11 @@ def test_chat_sentiment_uses_its_own_backend():
         assert components.status["chat_sentiment"].active != components.status[
             "sentiment"
         ].active
-        # Never the news artefact.
-        assert components.status["chat_sentiment"].active in {
-            "lexicon",
-            "sklearn:logreg-wisesight",
-            "sklearn:svc-wisesight",
-        }
+        # Never the news artefact. Asserted as the property rather than as a
+        # list of accepted names: the list broke the moment chat gained its own
+        # blend, which was a legitimate change the test should not have failed.
+        active = components.status["chat_sentiment"].active
+        assert "wisesight" in active or active == "lexicon", active
     finally:
         reset_components()
 

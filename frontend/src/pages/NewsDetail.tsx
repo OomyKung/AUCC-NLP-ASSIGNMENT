@@ -17,6 +17,7 @@ import {
   formatDateTime,
 } from '../components/ui'
 import { useAsync } from '../hooks'
+import { isUnclear } from '../lib/sentiment'
 import { api } from '../services/api'
 import type { SentimentSlug, Taxonomy } from '../types'
 
@@ -306,8 +307,12 @@ function MessageList({ newsId }: { newsId: number }) {
                 : message.sentiment === 'negative'
                   ? 'bg-negative'
                   : 'bg-neutral'
-            }`}
-            title={message.sentiment ?? 'ไม่ระบุ'}
+            } ${isUnclear(message.sentiment_confidence) ? 'opacity-30' : ''}`}
+            title={
+              isUnclear(message.sentiment_confidence)
+                ? 'ความมั่นใจต่ำเกินกว่าจะระบุ'
+                : (message.sentiment ?? 'ไม่ระบุ')
+            }
           />
           <div className="min-w-0 flex-1">
             <p className="text-sm text-slate-700 dark:text-slate-200" lang="th">
@@ -315,9 +320,14 @@ function MessageList({ newsId }: { newsId: number }) {
             </p>
             <p className="mt-0.5 text-[11px] text-slate-400">
               {message.author ?? 'ไม่ทราบชื่อ'} · {formatDateTime(message.published_at)}
-              {message.sentiment && ` · ${message.sentiment}`}
-              {message.sentiment_confidence != null &&
-                ` ${Math.round(message.sentiment_confidence * 100)}%`}
+              {/* Under the measured threshold the classifier is right 47.5% of
+                  the time, so the label is not presented as a finding. */}
+              {message.sentiment &&
+                (isUnclear(message.sentiment_confidence)
+                  ? ' · ไม่ชัดเจน'
+                  : ` · ${message.sentiment} ${Math.round(
+                      (message.sentiment_confidence ?? 0) * 100,
+                    )}%`)}
             </p>
           </div>
         </li>
