@@ -68,6 +68,10 @@ class ProgrammeOut(BaseModel):
     url: str
     transcript: TranscriptOut | None = None
     segment_count: int = 0
+    # Stories still carrying an extractive headline. Surfaced so the timeline
+    # can offer to write the rest rather than leaving an imported programme
+    # quietly reading worse than the ones that ship with the repository.
+    pending_headlines: int = 0
     segments: list[SegmentOut] = []
 
 
@@ -110,3 +114,30 @@ class AnalyseVideoResponse(BaseModel):
     frame_note: str = ""
     headlines_cached: int = 0
     headlines_written: int = 0
+
+
+class HeadlineJobRequest(BaseModel):
+    """Ask for LLM headlines on a programme that already has stories."""
+
+    video_id: str = Field(min_length=5, max_length=40)
+
+
+class HeadlineJobStatus(BaseModel):
+    """Progress of one programme's headline writing.
+
+    Reported rather than guessed at: a story takes about 20 seconds, so a long
+    programme is a quarter of an hour of work and the UI needs something honest
+    to show while it happens.
+    """
+
+    video_id: str
+    # queued | running | done | failed | cancelled
+    state: str
+    total: int
+    done: int
+    written: int
+    reused: int
+    latest: str = ""
+    note: str = ""
+    elapsed_seconds: float = 0.0
+    eta_seconds: float | None = None

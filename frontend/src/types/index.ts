@@ -376,7 +376,23 @@ export interface Programme {
   url: string
   transcript: BroadcastTranscript | null
   segment_count: number
+  /** Stories still carrying an extractive headline rather than a written one. */
+  pending_headlines: number
   segments: NewsSegment[]
+}
+
+/** Progress of writing LLM headlines for one programme. */
+export interface HeadlineJob {
+  video_id: string
+  state: 'queued' | 'running' | 'done' | 'failed' | 'cancelled'
+  total: number
+  done: number
+  written: number
+  reused: number
+  latest: string
+  note: string
+  elapsed_seconds: number
+  eta_seconds: number | null
 }
 
 export interface SegmentPage {

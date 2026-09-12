@@ -1,0 +1,173 @@
+{
+ "video_id": "9VEIWzSR1LY",
+ "entries": {
+  "eaea5addf6720b2a41fa:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ข่าววิสัยทั่วไทย-ต่างประเทศคุมศีกาวยาวัจกรสอบอดีตเจ้าอาวาสวัดพุทัย-ร้องไทยในUAE-ทูตอิสราเอลสังเกตปัญหา",
+   "entities": [],
+   "corrections": []
+  },
+  "61b18f03c70e032cf7db:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ตำรวจจับอดีตเจ้าอาวาสวัดใหญ่ในคดีฟอกเงิน 92 ล้าน",
+   "entities": [],
+   "corrections": []
+  },
+  "a41b55858bbcb856f7e4:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "วัดพุทัยสวรรค์ถูกกล่าวหาเรื่องการยักยอกเงิน 92 ล้านบาท",
+   "entities": [],
+   "corrections": []
+  },
+  "066be49e35dffb82e91d:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "นัท-fanพันธุ์แท้เผยอดีตหลวงพ่อโชติสร้างวัตถุมงคลมูลค่าสูงกว่า10ล้าน",
+   "entities": [],
+   "corrections": []
+  },
+  "87f9fda381384f602f7f:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ปัญหาใบอนุโมทนาบัตรที่วัดพุทัยสวรรค์เจอ",
+   "entities": [],
+   "corrections": []
+  },
+  "62ace362fd8ddbaf8011:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "กรมสรรพากรยกเลิกใบอนุโมทนาบัตร วัดพุททยสวรรค์ใช้ระบบอิเล็กทรอนิกส์",
+   "entities": [],
+   "corrections": []
+  },
+  "0939d0a214d9575bfbc0:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ปลัดอำเภอบางคล้ารับทราบคำสั่งรื้อถอนสิ่งปลูกสร้างและย้ายศพภายใน 7 วัน",
+   "entities": [],
+   "corrections": []
+  },
+  "bff37e98bab2f7d5c8a6:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "เจ้าหน้าที่อบต.เสม็ดใต้และบริษัทเอกชนรื้อถอนเต็นท์ในสุสานพบหลุมศพ 3 หลุม",
+   "entities": [],
+   "corrections": []
+  },
+  "f53e281cbc59fb6c4f74:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "กลุ่มคปท.นัดรวมตัวหน้าสถานเอกอัครราชทูตอิสราเอลเรียกร้องควบคุมพลเมืองอิสราเอล",
+   "entities": [],
+   "corrections": []
+  },
+  "700b333307c0f800be62:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "อิสราเอลวิจารณ์เป้าหมายชุมนุมเห็นสัญลักษณ์ต้านอิสราเอล-US",
+   "entities": [],
+   "corrections": []
+  },
+  "dd18ee609bab65efe1ee:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ชาวอิสราเอลจัดงานปีใหม่ในภูเก็ตต้านรุกเคลื่อนไหว",
+   "entities": [],
+   "corrections": []
+  },
+  "3b0e29185d41ebb6a776:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "รองผู้ว่ากทม.ชี้แจงกับกรรมาธิการสื่อสารหลังพบ Data Center ในกรุงเทพมหานคร",
+   "entities": [],
+   "corrections": []
+  },
+  "340ce0fe6022fd58725b:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "คณะกรรมาธิการสื่อสารฯตั้งอนุกรรมการ4ชุดจัดทำกรอบกฎหมายData Center",
+   "entities": [],
+   "corrections": []
+  },
+  "fc4c11d563b39c1c1028:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "รองนายกรัฐมนตรียืนยันควบคุมสถานการณ์รั่วน้ำมันท่อน้ำมันเก่าในย่านถนนพระราม 3",
+   "entities": [],
+   "corrections": []
+  },
+  "9417142a5f2e45cc222a:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "กำหนดพื้นที่ปลอดภัยรอบจุดขุดเจาะน้ำมันเป็น 3 โซน",
+   "entities": [],
+   "corrections": []
+  },
+  "23751b58d2bfd47ee21a:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "เจ้าหน้าที่ยังค้นหาจุดรั่วซึมน้ำมันไม่ได้ในโซนสีเหลืองรัศมี 100 มต.",
+   "entities": [],
+   "corrections": []
+  },
+  "878f5d8c19b54198f4c5:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "การอภิปรายงบปี 70 ฝ่ายค้านจี้กกต.เรื่องฮั้วสว.",
+   "entities": [],
+   "corrections": []
+  },
+  "50533e862e2e8e937569:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "นายบุญจงวงไตรชี้แจงการทำงานของอนุกรรมการกกต.ในคดีฮั้วสว.",
+   "entities": [],
+   "corrections": []
+  },
+  "25a860e15652cb90c2f3:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "démarchงบฯ กกต. ผู้ทรงเกียรติยืนยันตามกรรมาธิการ ส.ส.16 พรรคเห็นด้วย ฝ่ายค้านไม่เห็นด้วย 229 คน",
+   "entities": [],
+   "corrections": []
+  },
+  "c5093ca5a0b28d8c7a7a:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "อภิปรายงบประมาณโครงการไฟฟ้าโซล่าเซลล์มุกดาหารลดราคาแพง",
+   "entities": [],
+   "corrections": []
+  },
+  "57022b12dc6cfbabda64:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "ผู้ประกอบการเสนอราคาเสาไฟนวัตกรรมสูงกว่าปกติ 4-10 เท่า",
+   "entities": [],
+   "corrections": []
+  },
+  "45dd93edfbc469afdecf:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "เจ้าหน้าที่ค้ามนุษย์รับตัวหญิงไทยกลับไทยจากสหรัฐอาหรับเอมิเรต",
+   "entities": [],
+   "corrections": []
+  },
+  "8f923ac637f4dc87f8f4:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "กลุ่มค้ามนุษย์นำคนไทยนวดในดูไบถูกบังคับประเวณี",
+   "entities": [],
+   "corrections": []
+  },
+  "091dce4e1bc959daadf2:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "รัฐบาลไทยเสนอภาษีใหม่สำหรับรถยนต์ไฟฟ้าเพื่อส่งเสริมอุตสาหกรรมภายในประเทศ",
+   "entities": [],
+   "corrections": []
+  },
+  "a824710e06630369ab29:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "เอกชนร่วมพัฒนายานยนต์ไฟฟ้า อนุมัติ2อนุกรรมการส่งเสริม",
+   "entities": [],
+   "corrections": []
+  },
+  "440855f854135eaca887:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "นายกสมาคมเซรามิกลำปางวิเคราะห์ตลาดเซรามิกจีนท้าทายต้นทุนสูงไทย",
+   "entities": [],
+   "corrections": []
+  },
+  "1806e469702c2372801a:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "วิทยรัตนากรชี้ปัญหาธุรกิจไทย SME ลดลงหลังโควิด-19",
+   "entities": [],
+   "corrections": []
+  },
+  "33dd0d597a82b4960c84:ollama:qwen2.5:7b": {
+   "schema": 1,
+   "headline": "สมาคมธนาคารไทยร่วมมือยกระดับมาตรการกำกับธุรกรรมเงินสดและธุรกิจต่างชาติ",
+   "entities": [],
+   "corrections": []
+  }
+ }
+}

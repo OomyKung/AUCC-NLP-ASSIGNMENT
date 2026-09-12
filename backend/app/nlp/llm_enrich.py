@@ -137,12 +137,17 @@ _PREAMBLE = re.compile(
     r"(?:พูดถึง|กล่าวถึง|เกี่ยวกับ|นำเสนอ|รายงาน|เป็นเรื่อง)\s*(?:เรื่อง)?\s*"
 )
 
-# Scripts a Thai news headline never uses. qwen2.5 drifts into Chinese --
+# Scripts and letters a Thai news headline never uses. qwen2.5 drifts into
+# Chinese --
 # story 57 of the second programme came back entirely as 政坛对峙：反击与回应,
 # and a short prompt produced Thai that switched mid-sentence. Either way the
 # headline is unusable, and half a headline in the wrong script is worse than
 # none because the extractive fallback would have been readable.
-_FOREIGN_SCRIPT = re.compile(r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\u0400-\u04ff]")
+_FOREIGN_SCRIPT = re.compile(
+    r"[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff"  # japanese, chinese
+    r"\uac00-\ud7af\u0400-\u04ff"  # korean, cyrillic
+    r"\u00c0-\u024f]"  # accented latin: "démarchงบฯ กกต." was a real completion
+)
 
 # Straight and typographic quotes, which models like to wrap a headline in.
 _QUOTES = "\"'“”‘’「」"

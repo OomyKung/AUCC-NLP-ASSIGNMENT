@@ -887,7 +887,7 @@ def test_anthropic_without_a_key_is_reported_not_attempted(monkeypatch):
 def test_a_failing_model_leaves_the_extractive_headline_alone(monkeypatch):
     """A worse headline is a far better outcome than a missing story."""
     from app.nlp import llm_enrich
-    from app.services.segmentation import _enrich_with_llm
+    from app.services.segmentation import enrich_with_llm
 
     segment = Segment(index=0, start_ms=0, end_ms=60_000, text="ตำรวจจับกุมผู้ต้องหา")
     segment.headline = "extractive headline"
@@ -896,12 +896,12 @@ def test_a_failing_model_leaves_the_extractive_headline_alone(monkeypatch):
         raise llm_enrich.LLMUnavailable("ollama is not running")
 
     monkeypatch.setattr(llm_enrich, "_complete", boom)
-    assert _enrich_with_llm(segment) == "unavailable"
+    assert enrich_with_llm(segment) == "unavailable"
 
     assert segment.headline == "extractive headline"
     assert segment.enriched_by == ""
     # Reported as unavailable, so the caller can stop asking a dead provider.
-    assert _enrich_with_llm(segment) == "unavailable"
+    assert enrich_with_llm(segment) == "unavailable"
 
 
 def test_a_dead_provider_stops_being_asked(monkeypatch):
@@ -997,7 +997,7 @@ def test_a_recovering_provider_keeps_being_asked(monkeypatch):
             segment.enriched_by = "llm"
         return "model" if worked else "unavailable"
 
-    monkeypatch.setattr(segmentation, "_enrich_with_llm", flaky)
+    monkeypatch.setattr(segmentation, "enrich_with_llm", flaky)
 
     segments = [
         Segment(
@@ -1059,7 +1059,7 @@ def test_a_cached_headline_is_reused_without_calling_the_model(monkeypatch):
     """The reason the cache exists: 20 seconds a story, 112 stories."""
     from app.nlp import llm_enrich
     from app.services.enrichment_cache import EnrichmentCache
-    from app.services.segmentation import _enrich_with_llm
+    from app.services.segmentation import enrich_with_llm
 
     text = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดยาบ้าหนึ่งล้านเม็ด"
     cache = EnrichmentCache("video")
@@ -1072,7 +1072,7 @@ def test_a_cached_headline_is_reused_without_calling_the_model(monkeypatch):
 
     segment = _segment(text)
     segment.headline = "extractive"
-    assert _enrich_with_llm(segment, cache=cache) == "cache"
+    assert enrich_with_llm(segment, cache=cache) == "cache"
     assert segment.headline == "จับกุมคดียาเสพติดรายใหญ่"
     assert segment.enriched_by == "llm"
 
@@ -1116,7 +1116,7 @@ def test_no_cache_means_no_file_is_written(tmp_path, monkeypatch):
     from writing into committed data."""
     from app.config import settings
     from app.nlp import llm_enrich
-    from app.services.segmentation import _enrich_with_llm
+    from app.services.segmentation import enrich_with_llm
 
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     monkeypatch.setattr(
@@ -1124,7 +1124,7 @@ def test_no_cache_means_no_file_is_written(tmp_path, monkeypatch):
     )
 
     segment = _segment("ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก")
-    assert _enrich_with_llm(segment) == "model"
+    assert enrich_with_llm(segment) == "model"
     assert segment.headline == "พาดหัวจากโมเดล"
     assert not (tmp_path / "enrichments").exists()
 
@@ -1210,13 +1210,13 @@ def test_a_model_labelling_its_own_headline_is_stripped():
 
 def test_a_label_only_completion_falls_back_to_the_extractive_headline(monkeypatch):
     from app.nlp import llm_enrich
-    from app.services.segmentation import _enrich_with_llm
+    from app.services.segmentation import enrich_with_llm
 
     monkeypatch.setattr(llm_enrich, "_complete", lambda prompt, *, timeout: "พาดหัว:")
     segment = _segment("ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก")
     segment.headline = "extractive headline"
 
-    assert _enrich_with_llm(segment) == "unavailable"
+    assert enrich_with_llm(segment) == "unavailable"
     assert segment.headline == "extractive headline"
 
 
@@ -1225,7 +1225,7 @@ def test_tightening_the_cleaner_reaches_already_cached_headlines(monkeypatch):
     that was current when it was written."""
     from app.nlp import llm_enrich
     from app.services.enrichment_cache import EnrichmentCache
-    from app.services.segmentation import _enrich_with_llm
+    from app.services.segmentation import enrich_with_llm
 
     text = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
     cache = EnrichmentCache("video")
@@ -1240,7 +1240,7 @@ def test_tightening_the_cleaner_reaches_already_cached_headlines(monkeypatch):
         ),
     )
     segment = _segment(text)
-    assert _enrich_with_llm(segment, cache=cache) == "cache"
+    assert enrich_with_llm(segment, cache=cache) == "cache"
     assert segment.headline == "จับกุมคดียาเสพติด"
 
 
@@ -1250,7 +1250,7 @@ def test_disallowing_the_model_still_reads_the_cache(monkeypatch):
     the client waiting for 76 of them."""
     from app.nlp import llm_enrich
     from app.services.enrichment_cache import EnrichmentCache
-    from app.services.segmentation import _enrich_with_llm
+    from app.services.segmentation import enrich_with_llm
 
     cached_text = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
     fresh_text = "ฝนตกหนักต่อเนื่องทำให้เกิดน้ำท่วมในหลายจังหวัดภาคเหนือ"
@@ -1263,12 +1263,12 @@ def test_disallowing_the_model_still_reads_the_cache(monkeypatch):
     monkeypatch.setattr(llm_enrich, "_complete", must_not_be_called)
 
     hit = _segment(cached_text)
-    assert _enrich_with_llm(hit, cache=cache, allow_model=False) == "cache"
+    assert enrich_with_llm(hit, cache=cache, allow_model=False) == "cache"
     assert hit.headline == "จับกุมคดียาเสพติด"
 
     miss = _segment(fresh_text, index=1)
     miss.headline = "extractive headline"
-    assert _enrich_with_llm(miss, cache=cache, allow_model=False) == "skipped"
+    assert enrich_with_llm(miss, cache=cache, allow_model=False) == "skipped"
     assert miss.headline == "extractive headline"
 
 
@@ -1329,7 +1329,7 @@ def test_an_unusable_cached_headline_is_asked_again(monkeypatch):
     there."""
     from app.nlp import llm_enrich
     from app.services.enrichment_cache import EnrichmentCache
-    from app.services.segmentation import _enrich_with_llm
+    from app.services.segmentation import enrich_with_llm
 
     text = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
     cache = EnrichmentCache("video")
@@ -1339,7 +1339,7 @@ def test_an_unusable_cached_headline_is_asked_again(monkeypatch):
         llm_enrich, "_complete", lambda prompt, *, timeout: "จับกุมคดียาเสพติดรายใหญ่"
     )
     segment = _segment(text)
-    assert _enrich_with_llm(segment, cache=cache) == "model"
+    assert enrich_with_llm(segment, cache=cache) == "model"
     assert segment.headline == "จับกุมคดียาเสพติดรายใหญ่"
 
     # And with no model to ask, the extractive headline stands rather than an
@@ -1348,7 +1348,7 @@ def test_an_unusable_cached_headline_is_asked_again(monkeypatch):
     other.headline = "extractive headline"
     cache_only = EnrichmentCache("video")
     cache_only.put(text, headline="พาดหัว:", entities=[], corrections=[])
-    assert _enrich_with_llm(other, cache=cache_only, allow_model=False) == "skipped"
+    assert enrich_with_llm(other, cache=cache_only, allow_model=False) == "skipped"
     assert other.headline == "extractive headline"
     assert other.enriched_by == ""
 
@@ -1378,7 +1378,10 @@ def test_a_headline_in_the_wrong_language_is_rejected():
     # model starts in Thai and switches mid-sentence. Half a headline in the
     # wrong script is worse than none -- the extractive fallback was readable.
     assert _clean_headline("พาดหัวข่าว: ตำรวจยึด成果如下：新闻标题") == ""
-    # Latin inside a Thai headline is ordinary and stays.
+    # Accented Latin is the same defect in a quieter costume: "démarchงบฯ กกต."
+    # came back from a real programme.
+    assert _clean_headline("démarchงบฯ กกต. ผู้ทรงเกียรติยืนยัน") == ""
+    # Plain ASCII inside a Thai headline is ordinary and stays.
     assert _clean_headline("จัดระเบียบ Data Center ตามมติครม.") == "จัดระเบียบ Data Center ตามมติครม."
 
 
@@ -1399,7 +1402,7 @@ def test_a_cached_headline_does_not_freeze_the_entities(monkeypatch):
     silently never reached a cached story."""
     from app.nlp import llm_enrich
     from app.services.enrichment_cache import EnrichmentCache
-    from app.services.segmentation import _enrich_with_llm
+    from app.services.segmentation import enrich_with_llm
 
     text = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
     cache = EnrichmentCache("video")
@@ -1416,7 +1419,7 @@ def test_a_cached_headline_does_not_freeze_the_entities(monkeypatch):
     fresh = [{"text": "ตำรวจ", "label": "ORGANIZATION"}]
     segment.entities = fresh
 
-    assert _enrich_with_llm(segment, cache=cache) == "cache"
+    assert enrich_with_llm(segment, cache=cache) == "cache"
     assert segment.headline == "จับกุมคดียาเสพติด"
     assert segment.entities == fresh
 
@@ -1427,7 +1430,7 @@ def test_the_reported_totals_add_up_to_the_stories(monkeypatch):
     made a 36-story programme report "1 written, 36 reused"."""
     from app.nlp import llm_enrich
     from app.services.enrichment_cache import EnrichmentCache
-    from app.services.segmentation import _enrich_with_llm
+    from app.services.segmentation import enrich_with_llm
 
     good = "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
     stale = "ฝนตกหนักต่อเนื่องทำให้เกิดน้ำท่วมในหลายจังหวัดภาคเหนือ"
@@ -1439,9 +1442,241 @@ def test_the_reported_totals_add_up_to_the_stories(monkeypatch):
     monkeypatch.setattr(
         llm_enrich, "_complete", lambda prompt, *, timeout: "น้ำท่วมภาคเหนือ"
     )
-    assert _enrich_with_llm(_segment(good), cache=cache) == "cache"
-    assert _enrich_with_llm(_segment(stale, index=1), cache=cache) == "model"
+    assert enrich_with_llm(_segment(good), cache=cache) == "cache"
+    assert enrich_with_llm(_segment(stale, index=1), cache=cache) == "model"
 
     assert cache.hits == 1
     assert cache.writes == 1
     assert cache.hits + cache.writes == 2
+
+
+# --------------------------------------------------------------------------
+# Writing headlines after the fact
+#
+# An imported video gets extractive headlines, because 20-40 seconds a story is
+# far longer than a request may hold. Telling the user to go and run a CLI is a
+# limitation with instructions attached, so the work runs as a job instead.
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def broadcast_db(db_session):
+    """A stored programme with three stories and no written headlines."""
+    from app.models.broadcast import NewsSegment, VideoTranscript
+    from app.models.chat import ChatStream
+
+    stream = ChatStream(
+        video_id="jobVideo001",
+        url="https://www.youtube.com/watch?v=jobVideo001",
+        title="ข่าวเช้า",
+        collector="transcript",
+    )
+    db_session.add(stream)
+    db_session.flush()
+    transcript = VideoTranscript(
+        stream_id=stream.id, source="youtube-asr:th-orig", duration_ms=600_000
+    )
+    db_session.add(transcript)
+    db_session.flush()
+    for index in range(3):
+        db_session.add(
+            NewsSegment(
+                transcript_id=transcript.id,
+                stream_id=stream.id,
+                position=index,
+                start_ms=index * 60_000,
+                end_ms=(index + 1) * 60_000,
+                headline=f"extractive {index}",
+                transcript_text=(
+                    f"ข่าวเรื่องที่ {index} "
+                    "ตำรวจจับกุมผู้ต้องหาคดียาเสพติดรายใหญ่ยึดของกลางจำนวนมาก"
+                ),
+                entities=[{"text": "ตำรวจ", "label": "ORGANIZATION"}],
+            )
+        )
+    db_session.commit()
+    return db_session
+
+
+@pytest.fixture
+def job_registry(monkeypatch, tmp_path, broadcast_db):
+    """Point the job service at the test database and clear its registry.
+
+    ``data_dir`` is redirected too, and that is not belt and braces: the job
+    always passes an enrichment cache, so without this the tests write headlines
+    into the committed ``data/enrichments/`` -- which they did, and the next test
+    then read them back as cache hits and quietly stopped exercising the model
+    path at all.
+    """
+    from app.config import settings
+    from app.services import headline_jobs
+
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
+    monkeypatch.setattr(
+        headline_jobs, "SessionLocal", lambda: _NonClosingSession(broadcast_db)
+    )
+    headline_jobs._jobs.clear()
+    yield headline_jobs
+    headline_jobs._jobs.clear()
+
+
+class _NonClosingSession:
+    """Hands the worker the test session without letting it close it."""
+
+    def __init__(self, session):
+        self._session = session
+
+    def __enter__(self):
+        return self._session
+
+    def __exit__(self, *exc):
+        return False
+
+
+def _wait_for(predicate, timeout: float = 5.0) -> bool:
+    import time
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.02)
+    return False
+
+
+def test_a_job_writes_every_missing_headline(job_registry, broadcast_db, monkeypatch):
+    from app.models.broadcast import NewsSegment
+    from app.nlp import llm_enrich
+
+    monkeypatch.setattr(
+        llm_enrich, "_complete", lambda prompt, *, timeout: "จับกุมคดียาเสพติดรายใหญ่"
+    )
+
+    job = job_registry.start("jobVideo001")
+    assert job.total == 3
+    assert _wait_for(lambda: not job.running), job.state
+    assert job.state == "done"
+    assert job.written == 3
+
+    rows = broadcast_db.query(NewsSegment).all()
+    assert all(row.enriched_by == "llm" for row in rows)
+    assert all(row.headline == "จับกุมคดียาเสพติดรายใหญ่" for row in rows)
+    # The extractor's entities are untouched: in headline-only mode the model
+    # returns none, and an empty list must not overwrite them.
+    assert all(row.entities == [{"text": "ตำรวจ", "label": "ORGANIZATION"}] for row in rows)
+
+
+def test_only_one_programme_is_written_at_a_time(job_registry, monkeypatch):
+    """Not a queueing nicety: the local model holds about 6 GB, and two at once
+    is how this machine runs out of memory."""
+    import threading
+
+    from app.nlp import llm_enrich
+
+    release = threading.Event()
+    monkeypatch.setattr(
+        llm_enrich,
+        "_complete",
+        lambda prompt, *, timeout: (release.wait(3), "พาดหัวข่าว")[1],
+    )
+
+    job = job_registry.start("jobVideo001")
+    assert _wait_for(lambda: job.state == "running")
+    try:
+        with pytest.raises(job_registry.JobRejected, match="Already writing"):
+            job_registry.start("someOtherVid")
+        # The same video is not a second job -- a double-clicked button is safe.
+        assert job_registry.start("jobVideo001") is job
+    finally:
+        release.set()
+        _wait_for(lambda: not job.running)
+
+
+def test_a_job_for_an_unknown_video_is_refused(job_registry):
+    with pytest.raises(job_registry.JobRejected, match="No stories"):
+        job_registry.start("neverImported")
+
+
+def test_a_finished_programme_is_refused(job_registry, broadcast_db):
+    from app.models.broadcast import NewsSegment
+
+    for row in broadcast_db.query(NewsSegment).all():
+        row.enriched_by = "llm"
+    broadcast_db.commit()
+
+    with pytest.raises(job_registry.JobRejected, match="already has a written"):
+        job_registry.start("jobVideo001")
+
+
+def test_a_dead_provider_fails_the_job_rather_than_grinding_through_it(
+    job_registry, monkeypatch
+):
+    from app.nlp import llm_enrich
+
+    def unreachable(prompt, *, timeout):
+        raise llm_enrich.LLMUnavailable("connection refused")
+
+    monkeypatch.setattr(llm_enrich, "_complete", unreachable)
+
+    job = job_registry.start("jobVideo001")
+    assert _wait_for(lambda: not job.running), job.state
+    assert job.state == "failed"
+    assert "Ollama" in job.note
+
+
+def test_cancelling_keeps_what_was_already_written(
+    job_registry, broadcast_db, monkeypatch
+):
+    """Every headline is committed as it lands, which is what makes stopping
+    safe rather than wasteful."""
+    import threading
+
+    from app.models.broadcast import NewsSegment
+    from app.nlp import llm_enrich
+
+    first_done = threading.Event()
+    hold = threading.Event()
+    calls = []
+
+    def slow(prompt, *, timeout):
+        calls.append(prompt)
+        if len(calls) == 1:
+            return "พาดหัวแรก"
+        first_done.set()
+        hold.wait(3)
+        return "พาดหัวที่สอง"
+
+    monkeypatch.setattr(llm_enrich, "_complete", slow)
+    try:
+        job = job_registry.start("jobVideo001")
+        assert _wait_for(first_done.is_set)
+        job_registry.cancel("jobVideo001")
+    finally:
+        hold.set()
+
+    assert _wait_for(lambda: not job.running), job.state
+    assert job.state == "cancelled"
+
+    written = [
+        row for row in broadcast_db.query(NewsSegment).all() if row.enriched_by == "llm"
+    ]
+    assert written, "the headline finished before cancelling should be kept"
+    assert any(row.headline == "พาดหัวแรก" for row in written)
+
+
+def test_the_headline_endpoints_report_what_the_caller_can_act_on(job_registry):
+    """404 for a programme nobody started, 409 for one with nothing to do --
+    both are conditions the caller can do something about."""
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    with TestClient(create_app()) as client:
+        assert client.get("/api/broadcast/headlines/neverStarted").status_code == 404
+        assert client.delete("/api/broadcast/headlines/neverStarted").status_code == 404
+
+        response = client.post(
+            "/api/broadcast/headlines", json={"video_id": "neverImported"}
+        )
+        assert response.status_code == 409
+        assert "Import the video first" in response.json()["detail"]

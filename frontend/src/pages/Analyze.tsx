@@ -608,17 +608,16 @@ function YouTubeImportPanel() {
                 </p>
               )}
               {result.headlines_cached === 0 && (
-                /* Writing a headline takes ~20s per story, which is far longer
-                   than a request should hold -- so the import uses the
-                   extractive headline and points at the command that upgrades
-                   it, rather than silently looking worse than the shipped
-                   timelines. */
+                /* Writing a headline takes 20-40s per story, far longer than a
+                   request should hold. So the import returns the extractive
+                   headline and hands the reader the button that upgrades it in
+                   the background. */
                 <p className="text-xs text-slate-400" lang="th">
-                  พาดหัวช่วงข่าวมาจากการตัดข้อความจริงในคลิป · อยากได้พาดหัวที่ AI
-                  เขียนให้ ใช้คำสั่ง{' '}
-                  <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">
-                    python analyse_video.py {result.video_id}
-                  </code>
+                  พาดหัวช่วงข่าวยังเป็นข้อความที่ตัดมาจากคลิป · กด{' '}
+                  <span className="font-medium text-slate-500 dark:text-slate-300">
+                    เขียนพาดหัวด้วย AI
+                  </span>{' '}
+                  ในหน้าไทม์ไลน์เพื่อให้โมเดลเขียนให้ (ทำงานเบื้องหลัง)
                 </p>
               )}
             </>

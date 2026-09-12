@@ -17,11 +17,14 @@ from app.models.chat import ChatStream
 from app.schemas.broadcast import (
     AnalyseVideoRequest,
     AnalyseVideoResponse,
+    HeadlineJobRequest,
+    HeadlineJobStatus,
     ProgrammeOut,
     SegmentListResponse,
     SegmentOut,
     TranscriptOut,
 )
+from app.services import headline_jobs
 from app.services.broadcast import analyse_video, list_segments
 from app.services.collectors.base import CollectorError
 from app.services.transcripts import TranscriptUnavailable
@@ -123,6 +126,11 @@ def programmes(db: Session = Depends(get_db)) -> list[ProgrammeOut]:
                     character_count=transcript.character_count,
                 ),
                 segment_count=len(transcript.segments),
+                pending_headlines=sum(
+                    1
+                    for segment in transcript.segments
+                    if segment.enriched_by != "llm"
+                ),
             )
         )
     return results
@@ -196,3 +204,56 @@ def analyse(
     except CollectorError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return AnalyseVideoResponse(**result.as_dict())
+
+
+@router.post(
+    "/broadcast/headlines",
+    response_model=HeadlineJobStatus,
+    summary="Write LLM headlines for a programme, in the background",
+)
+def start_headlines(payload: HeadlineJobRequest) -> HeadlineJobStatus:
+    """Fill in the headlines an import could not wait for.
+
+    Returns immediately with a job to poll. The work runs in a worker thread and
+    commits each headline as it lands, so the timeline fills in while the caller
+    watches and nothing is lost if the poll stops or the process restarts.
+
+    Calling this again for a programme already being written returns the same
+    job rather than starting a second one.
+    """
+    try:
+        job = headline_jobs.start(payload.video_id)
+    except headline_jobs.JobRejected as exc:
+        # Every rejection is something the caller can act on: another programme
+        # is running, the video was never imported, or there is nothing to do.
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return HeadlineJobStatus(**job.as_dict())
+
+
+@router.get(
+    "/broadcast/headlines/{video_id}",
+    response_model=HeadlineJobStatus,
+    summary="Progress of a headline-writing job",
+)
+def headline_status(video_id: str) -> HeadlineJobStatus:
+    job = headline_jobs.get(video_id)
+    if job is None:
+        raise HTTPException(
+            status_code=404, detail=f"No headline job has been started for {video_id}."
+        )
+    return HeadlineJobStatus(**job.as_dict())
+
+
+@router.delete(
+    "/broadcast/headlines/{video_id}",
+    response_model=HeadlineJobStatus,
+    summary="Stop a headline-writing job",
+)
+def stop_headlines(video_id: str) -> HeadlineJobStatus:
+    """Stop after the story in flight. Everything written so far is kept."""
+    job = headline_jobs.cancel(video_id)
+    if job is None:
+        raise HTTPException(
+            status_code=404, detail=f"No headline job has been started for {video_id}."
+        )
+    return HeadlineJobStatus(**job.as_dict())

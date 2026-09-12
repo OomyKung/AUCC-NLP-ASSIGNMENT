@@ -272,6 +272,39 @@ Headlines are the exception to "do everything in the request" — writing one
 takes about 20 seconds, so an imported video gets extractive headlines and the
 UI names the command that upgrades them (`python analyse_video.py <video id>`).
 
+#### Writing the headlines an import could not wait for
+
+A model spends 20-40 seconds on a story, so the 56-story programme above is
+about half an hour. That is far too long to hold an HTTP request open, and
+"go and run `analyse_video.py`" is a limitation with instructions attached
+rather than a feature — the imported programme just sits there reading visibly
+worse than the two that ship with the repository.
+
+So the timeline offers a button, and the work runs as a job the page watches:
+
+```
+POST   /api/broadcast/headlines        {"video_id": "..."}   -> start, returns progress
+GET    /api/broadcast/headlines/{id}                          -> poll
+DELETE /api/broadcast/headlines/{id}                          -> stop, keeping what is written
+```
+
+Three properties make it safe to walk away from:
+
+* **Every headline is committed as it lands.** Stopping, closing the tab, or
+  killing the process keeps everything finished so far — which is also what
+  makes the stop button harmless rather than wasteful.
+* **One programme at a time, globally.** Not a queueing nicety: the local model
+  holds about 6 GB, and two at once is how a 16 GB machine runs out of memory.
+  A second request gets a 409 naming the programme already running.
+* **A dead provider fails the job instead of grinding through it.** Three
+  consecutive failures and it stops with "is Ollama running?", rather than
+  spending two hours discovering the same thing 56 times.
+
+Rows are updated in place rather than re-analysed: the stories already have
+their text, topic, keywords and frames, and re-running the pipeline would
+re-fetch, re-segment and re-capture for nothing — and could move a boundary
+under a timeline someone is reading.
+
 #### Finding where one story ends and the next begins
 
 Three independent signals, combined — and every boundary records which ones fired,
@@ -482,7 +515,7 @@ stream looking for one story.
   | Labels its own answer | `พาดหัว: โค้ชวอลเลย์บอล…`, 2 of the first 36 | strip an explicit `label:` prefix |
   | Restates the question | `ข้อความนี้พูดถึงเรื่องการลุยธุรกิจโรงแรม…` | strip the preamble, keep the rest |
   | Explains itself afterwards | a second paragraph justifying the headline | first non-empty line only |
-  | Drifts out of Thai script | `政坛对峙：反击与回应`; `โจรจี้银行抢劫案嫌疑人被捕`; `แก๊งคอซентเตอร์` — Cyrillic inside a Thai word | reject: CJK, Hangul or Cyrillic present, or no Thai at all |
+  | Drifts out of Thai script | `政坛对峙：反击与回应`; `โจรจี้银行抢劫案嫌疑人被捕`; `แก๊งคอซентเตอร์` — Cyrillic inside a Thai word; `démarchงบฯ กกต.` — French | reject: CJK, Hangul, Cyrillic or accented Latin present, or no Thai at all |
 
   Rejection falls back to the extractive headline, which is where the one
   remaining fallback comes from — that story produced a Cyrillic-infected word

@@ -13,6 +13,7 @@ import type {
   BackendStatus,
   ChatMessage,
   Evaluation,
+  HeadlineJob,
   Health,
   IngestResult,
   KeywordCount,
@@ -168,6 +169,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  /** Start writing LLM headlines for a programme. Returns a job to poll. */
+  startHeadlines: (video_id: string) =>
+    request<HeadlineJob>('/broadcast/headlines', {
+      method: 'POST',
+      body: JSON.stringify({ video_id }),
+    }),
+  headlineStatus: (video_id: string) =>
+    request<HeadlineJob>(`/broadcast/headlines/${video_id}`),
+  stopHeadlines: (video_id: string) =>
+    request<HeadlineJob>(`/broadcast/headlines/${video_id}`, { method: 'DELETE' }),
 
   streams: () => request<Stream[]>('/streams'),
   snapshots: () => request<SnapshotInfo[]>('/ingest/snapshots'),

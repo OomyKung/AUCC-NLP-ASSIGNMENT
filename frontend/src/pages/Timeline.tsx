@@ -17,11 +17,14 @@
  *    shape rather than as a list.
  */
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ErrorState, LoadingState } from '../components/ui'
-import { useAsync } from '../hooks'
-import { api } from '../services/api'
-import type { NewsSegment, Programme } from '../types'
+import { notify, useAsync } from '../hooks'
+import { ApiError, api } from '../services/api'
+import type { HeadlineJob, NewsSegment, Programme } from '../types'
+
+/** How often to ask a running headline job how it is getting on. */
+const POLL_MS = 4000
 
 /** How each boundary signal is explained to a reader, in Thai. */
 const REASON_LABEL: Record<string, string> = {
@@ -47,6 +50,13 @@ export default function TimelinePage() {
     () => (selected ? api.programme(selected) : Promise.resolve(null)),
     [selected],
   )
+
+  // Reloading both lists is what makes the timeline fill in while the job runs:
+  // the cards get their new headlines and the picker's pending count drops.
+  const refresh = useCallback(() => {
+    programme.reload()
+    programmes.reload()
+  }, [programme, programmes])
 
   if (programmes.error) {
     return <ErrorState message={programmes.error} onRetry={programmes.reload} />
@@ -81,7 +91,7 @@ export default function TimelinePage() {
       ) : programme.loading && !programme.data ? (
         <LoadingState rows={4} />
       ) : programme.data ? (
-        <ProgrammeTimeline programme={programme.data} />
+        <ProgrammeTimeline programme={programme.data} onHeadlines={refresh} />
       ) : null}
     </div>
   )
@@ -140,7 +150,13 @@ function ProgrammePicker({
   )
 }
 
-function ProgrammeTimeline({ programme }: { programme: Programme }) {
+function ProgrammeTimeline({
+  programme,
+  onHeadlines,
+}: {
+  programme: Programme
+  onHeadlines: () => void
+}) {
   const segments = programme.segments
   const total = useMemo(
     () => segments.reduce((max, s) => Math.max(max, s.end_ms), 0),
@@ -170,6 +186,7 @@ function ProgrammeTimeline({ programme }: { programme: Programme }) {
         </div>
 
         <TopicStrip segments={segments} total={total} />
+        <HeadlineWriter programme={programme} onProgress={onHeadlines} />
       </section>
 
       <ol className="space-y-3">
@@ -180,6 +197,178 @@ function ProgrammeTimeline({ programme }: { programme: Programme }) {
         ))}
       </ol>
     </>
+  )
+}
+
+/**
+ * Writes the LLM headlines an import could not wait for.
+ *
+ * A model spends 20-40 seconds on a story, so a 56-story programme is half an
+ * hour. That is far too long to hold an HTTP request, but perfectly fine as a
+ * job the page watches: the backend commits every headline as it lands, so this
+ * reloads the timeline on each poll and the cards improve one by one while the
+ * reader is looking at them.
+ *
+ * Nothing here is destructive. Stopping keeps every headline already written,
+ * and closing the page does not stop the job -- reopening it picks the progress
+ * back up.
+ */
+function HeadlineWriter({
+  programme,
+  onProgress,
+}: {
+  programme: Programme
+  onProgress: () => void
+}) {
+  const [job, setJob] = useState<HeadlineJob | null>(null)
+  const [starting, setStarting] = useState(false)
+  const videoId = programme.video_id
+  // Kept in a ref so the polling effect does not restart on every render.
+  const progressRef = useRef(onProgress)
+  progressRef.current = onProgress
+
+  // Pick up a job that was already running when the page opened.
+  useEffect(() => {
+    let cancelled = false
+    setJob(null)
+    api
+      .headlineStatus(videoId)
+      .then((status) => {
+        if (!cancelled) setJob(status)
+      })
+      .catch(() => {
+        /* 404 simply means nothing has been started for this programme. */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [videoId])
+
+  const running = job?.state === 'running' || job?.state === 'queued'
+
+  useEffect(() => {
+    if (!running) return
+    let stopped = false
+    const timer = window.setInterval(async () => {
+      try {
+        const status = await api.headlineStatus(videoId)
+        if (stopped) return
+        setJob((previous) => {
+          // Only reload the list when a headline actually landed, so a poll
+          // that changed nothing does not refetch the whole programme.
+          if (previous && status.done > previous.done) progressRef.current()
+          return status
+        })
+        if (status.state !== 'running' && status.state !== 'queued') {
+          progressRef.current()
+          notify(
+            status.state === 'done'
+              ? `เขียนพาดหัวครบ ${status.total} ช่วงแล้ว`
+              : status.note || `งานเขียนพาดหัว: ${status.state}`,
+            status.state === 'done' ? 'success' : 'info',
+          )
+        }
+      } catch {
+        /* A failed poll is not worth surfacing; the next one will tell us. */
+      }
+    }, POLL_MS)
+    return () => {
+      stopped = true
+      window.clearInterval(timer)
+    }
+  }, [running, videoId])
+
+  const start = async () => {
+    setStarting(true)
+    try {
+      setJob(await api.startHeadlines(videoId))
+    } catch (err) {
+      notify(
+        err instanceof ApiError ? err.message : 'เริ่มเขียนพาดหัวไม่สำเร็จ',
+        'error',
+      )
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  const stop = async () => {
+    try {
+      setJob(await api.stopHeadlines(videoId))
+    } catch {
+      /* Already finished on its own. */
+    }
+  }
+
+  const pending = programme.pending_headlines
+  if (!running && pending === 0) {
+    return (
+      <p className="mt-4 text-xs text-slate-400" lang="th">
+        ทุกช่วงข่าวมีพาดหัวที่เขียนโดยโมเดลภาษาแล้ว
+      </p>
+    )
+  }
+
+  if (!running) {
+    return (
+      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/40">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-slate-700 dark:text-slate-200" lang="th">
+            {pending} ช่วงยังใช้พาดหัวที่ตัดมาจากข้อความในคลิป
+          </p>
+          <p className="mt-0.5 text-xs text-slate-400" lang="th">
+            ให้โมเดลภาษา (ทำงานในเครื่อง ฟรี) เขียนพาดหัวให้ · ประมาณ 20-40
+            วินาทีต่อช่วง ทำงานเบื้องหลัง ปิดหน้านี้ได้
+            {job?.note ? ` · ${job.note}` : ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={start}
+          disabled={starting}
+          className="btn-primary shrink-0"
+        >
+          {starting ? 'กำลังเริ่ม…' : 'เขียนพาดหัวด้วย AI'}
+        </button>
+      </div>
+    )
+  }
+
+  const percent = job.total ? Math.round((job.done / job.total) * 100) : 0
+  return (
+    <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-900/40">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-slate-700 dark:text-slate-200" lang="th">
+          กำลังเขียนพาดหัว {job.done}/{job.total} ช่วง
+          {job.eta_seconds != null && job.eta_seconds > 0 && (
+            <span className="text-slate-400">
+              {' '}
+              · เหลืออีกประมาณ {Math.ceil(job.eta_seconds / 60)} นาที
+            </span>
+          )}
+        </p>
+        <button type="button" onClick={stop} className="btn-ghost shrink-0 text-xs">
+          หยุด (เก็บที่เขียนแล้ว)
+        </button>
+      </div>
+      <div
+        className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
+        role="progressbar"
+        aria-valuenow={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div
+          className="h-full rounded-full bg-brand-500 transition-[width] duration-500"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      {job.latest && (
+        <p className="truncate text-xs text-slate-400" lang="th">
+          ล่าสุด: {job.latest}
+        </p>
+      )}
+    </div>
   )
 }
 

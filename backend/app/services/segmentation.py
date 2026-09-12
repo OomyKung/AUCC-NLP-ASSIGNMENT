@@ -898,7 +898,7 @@ def analyse_segments(
         segment.headline = synthesise_headline(segment)
 
         if use_llm:
-            status = _enrich_with_llm(
+            status = enrich_with_llm(
                 segment, cache=cache, allow_model=allow_model
             )
             if status == "unavailable":
@@ -952,13 +952,18 @@ def synthesise_headline(segment: Segment, *, max_length: int = 120) -> str:
     return headline or f"ช่วง {segment.timecode}"
 
 
-def _enrich_with_llm(
+def enrich_with_llm(
     segment: Segment,
     *,
     cache: EnrichmentCache | None = None,
     allow_model: bool = True,
 ) -> str:
     """Replace the headline (and, if enabled, the entities) with the model's.
+
+    Public because two callers need it: this module, analysing a programme in
+    one pass, and :mod:`app.services.headline_jobs`, filling headlines in
+    afterwards for a video that was imported through the API -- where 20 seconds
+    a story is far too long to hold a request open.
 
     Returns what happened -- ``"cache"``, ``"model"``, ``"skipped"`` or
     ``"unavailable"`` -- rather than a bare success flag, because the caller
